@@ -65,7 +65,7 @@ The original proof of concept. Binary decision (flap / don't flap), single angul
 ### Phasic Chess (chess28.html)
 Pre-SACK chess engine using angular pressure fields from the king's perspective. Produced interesting emergent gameplay through field geometry alone — no SACK chain layer. Established the signal encoding approach and visualisation framework.
 
-### SACK Chess v1 (sack-chess2.html)
+### SACK Chess v1 (sack-chess1.html)
 First integration of SACK neuron chain layer with phasic chess field. Outcome-based reinforcement only — no piece-loss penalty. Chain carries power delta across moves. Result: kings-only endgame emerging by game 3 with no hardcoded strategy. Two distinct playing styles developing from opposite angular perspectives on the same data.
 
 ### SACK Chess v4 (sack-chess2.html)
