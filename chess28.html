@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PHASIC CHESS</title>
+<style>
+:root {
+  --bg:#030609;--panel:#080e14;--border:#0d2233;
+  --wf:#00e5ff;--bf:#ff3d6e;--neutral:#1a2a3a;
+  --text:#7ab8d4;--textbright:#c8eaf7;
+  --boardlight:#0d1f2d;--boarddark:#060f18;--gold:#ffd700;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Courier New','Lucida Console',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);pointer-events:none;z-index:1000;}
+header{width:100%;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#05111c 0%,transparent 100%);flex-wrap:wrap;gap:8px;}
+.title{font-size:1rem;font-weight:900;letter-spacing:0.3em;color:var(--textbright);text-shadow:0 0 20px rgba(0,229,255,0.5);}
+.subtitle{font-size:0.6rem;letter-spacing:0.18em;opacity:0.6;margin-top:2px;}
+.statusbar{display:flex;gap:14px;font-size:0.65rem;flex-wrap:wrap;align-items:flex-end;}
+.stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.stat-label{opacity:0.4;font-size:0.5rem;letter-spacing:0.15em;}
+.stat-value{color:var(--textbright);}
+.mem-badge{font-size:0.48rem;letter-spacing:0.12em;padding:3px 8px;border:1px solid;display:inline-flex;align-items:center;gap:5px;margin-top:2px;}
+.mem-badge.live{border-color:#00ff88;color:#00ff88;}
+.mem-badge.cold{border-color:var(--border);color:var(--text);opacity:0.4;}
+.mem-dot{width:4px;height:4px;border-radius:50%;background:currentColor;}
+.mem-dot.pulse{animation:mpulse 1.8s infinite;}
+@keyframes mpulse{0%,100%{opacity:1}50%{opacity:0.2}}
+.checkbanner{width:100%;max-width:1200px;padding:6px 16px;display:flex;gap:10px;}
+.chkbox{flex:1;padding:10px 16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;background:var(--panel);}
+.chkbox.wc{border-color:rgba(0,229,255,0.5);}
+.chkbox.bc{border-color:rgba(255,61,110,0.5);}
+.chk-lbl{font-size:0.52rem;letter-spacing:0.18em;opacity:0.55;}
+.chk-sub{font-size:0.44rem;opacity:0.3;letter-spacing:0.12em;margin-top:2px;}
+.chk-num{font-size:1.5rem;font-weight:900;font-variant-numeric:tabular-nums;}
+.chkbox.wc .chk-num{color:var(--wf);text-shadow:0 0 14px var(--wf);}
+.chkbox.bc .chk-num{color:var(--bf);text-shadow:0 0 14px var(--bf);}
+.chk-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--neutral);}
+.chk-fill{height:100%;transition:width 0.35s ease;}
+.chk-fill.w{background:var(--wf);box-shadow:0 0 8px var(--wf);}
+.chk-fill.b{background:var(--bf);box-shadow:0 0 8px var(--bf);}
+.overlay{display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.win-box{border:1px solid var(--border);padding:44px 64px;text-align:center;background:var(--panel);position:relative;overflow:hidden;max-width:480px;}
+.win-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.win-box.ww::before{background:var(--wf);box-shadow:0 0 24px var(--wf);}
+.win-box.bw::before{background:var(--bf);box-shadow:0 0 24px var(--bf);}
+.win-tag{font-size:0.52rem;letter-spacing:0.4em;opacity:0.45;margin-bottom:10px;}
+.win-name{font-size:2.4rem;font-weight:900;letter-spacing:0.25em;margin-bottom:6px;}
+.win-box.ww .win-name{color:var(--wf);text-shadow:0 0 30px var(--wf);}
+.win-box.bw .win-name{color:var(--bf);text-shadow:0 0 30px var(--bf);}
+.win-detail{font-size:0.6rem;opacity:0.55;letter-spacing:0.18em;line-height:1.8;}
+.win-merge{font-size:0.58rem;color:var(--gold);margin-top:10px;letter-spacing:0.12em;opacity:0.85;line-height:1.6;}
+.win-btn{margin-top:26px;font-family:'Courier New',monospace;font-size:0.62rem;letter-spacing:0.2em;padding:14px 34px;background:transparent;border:1px solid var(--wf);color:var(--wf);cursor:pointer;}
+.genbanner{width:100%;max-width:1200px;padding:0 16px;display:flex;gap:10px;font-size:0.58rem;letter-spacing:0.1em;flex-wrap:wrap;}
+.genstat{flex:1;min-width:100px;background:var(--panel);border:1px solid var(--border);padding:6px 12px;display:flex;justify-content:space-between;align-items:center;}
+.genstat span:last-child{color:var(--textbright);font-size:0.65rem;}
+.main{display:grid;grid-template-columns:200px 1fr 200px;gap:14px;padding:14px 16px;width:100%;max-width:1200px;align-items:start;}
+@media(max-width:800px){.main{grid-template-columns:1fr;}.sidepanel{display:grid;grid-template-columns:1fr 1fr;gap:8px;}}
+.sidepanel{display:flex;flex-direction:column;gap:12px;}
+.panelbox{background:var(--panel);border:1px solid var(--border);padding:12px;position:relative;overflow:hidden;}
+.panelbox::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+.panelbox.ws::before{background:var(--wf);box-shadow:0 0 10px var(--wf);}
+.panelbox.bs::before{background:var(--bf);box-shadow:0 0 10px var(--bf);}
+.paneltitle{font-size:0.58rem;letter-spacing:0.2em;margin-bottom:8px;opacity:0.6;}
+.paneltitle.wt{color:var(--wf);}
+.paneltitle.bk{color:var(--bf);}
+.polarwrap{display:flex;align-items:center;justify-content:center;}
+.polarwrap canvas{border-radius:50%;width:100%;max-width:188px;height:auto;}
+.fbarwrap{margin-top:8px;}
+.flabel{font-size:0.58rem;letter-spacing:0.12em;opacity:0.5;margin-bottom:4px;display:flex;justify-content:space-between;}
+.ftrack{height:4px;background:var(--neutral);position:relative;overflow:hidden;}
+.ffill{height:100%;transition:width 0.4s ease;}
+.wfill{background:var(--wf);box-shadow:0 0 8px var(--wf);}
+.bfill{background:var(--bf);box-shadow:0 0 8px var(--bf);}
+.logbox{background:var(--panel);border:1px solid var(--border);padding:10px;height:150px;overflow-y:auto;font-size:0.6rem;line-height:1.7;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.log-entry{opacity:0.7;}
+.log-entry.important{opacity:1;color:var(--textbright);}
+.log-entry.w-event{color:var(--wf);}
+.log-entry.b-event{color:var(--bf);}
+.log-entry.check{color:#ffcc00;}
+.log-entry.win{color:var(--gold);}
+.log-entry.merge{color:#00ff88;}
+.centerwrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+#board{display:grid;grid-template-columns:repeat(8,1fr);border:1px solid var(--border);}
+.cell{width:calc(min(52vw,480px)/8);height:calc(min(52vw,480px)/8);display:flex;align-items:center;justify-content:center;position:relative;font-size:clamp(1rem,3.5vw,1.8rem);cursor:default;}
+.cell.light{background:var(--boardlight);}
+.cell.dark{background:var(--boarddark);}
+.cell.hlw{box-shadow:inset 0 0 0 2px var(--wf);background:rgba(0,229,255,0.08)!important;}
+.cell.hlb{box-shadow:inset 0 0 0 2px var(--bf);background:rgba(255,61,110,0.08)!important;}
+.piece-w,.piece-b{font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Arial Unicode MS',serif;line-height:1;display:block;}
+.piece-w{text-shadow:0 0 12px var(--wf),0 0 20px rgba(0,229,255,0.5);filter:drop-shadow(0 0 4px rgba(0,229,255,0.6));}
+.piece-b{text-shadow:0 0 12px var(--bf),0 0 20px rgba(255,61,110,0.5);filter:drop-shadow(0 0 4px rgba(255,61,110,0.6));}
+.king-check{animation:checkpulse 0.5s infinite alternate;}
+@keyframes checkpulse{from{filter:drop-shadow(0 0 6px #ffcc00);}to{filter:drop-shadow(0 0 20px #ffcc00);}}
+.coord{position:absolute;font-size:0.4rem;opacity:0.2;}
+.coord-rank{bottom:1px;right:2px;}
+.coord-file{top:1px;left:2px;}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;}
+.btn{font-family:'Courier New','Lucida Console',monospace;font-size:0.6rem;letter-spacing:0.15em;padding:10px 16px;min-height:44px;background:transparent;border:1px solid var(--border);color:var(--text);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.btn.primary{border-color:var(--wf);color:var(--wf);}
+.btn.danger{border-color:var(--bf);color:var(--bf);}
+.btn.gold{border-color:var(--gold);color:var(--gold);font-size:0.55rem;}
+.btn:disabled{opacity:0.3;cursor:not-allowed;}
+.speedctl{display:flex;align-items:center;gap:6px;font-size:0.6rem;}
+.speedctl input{width:70px;accent-color:var(--wf);}
+.turnindicator{display:flex;gap:18px;font-size:0.62rem;letter-spacing:0.15em;}
+.turndot{display:flex;align-items:center;gap:6px;opacity:0.4;transition:opacity 0.3s;}
+.turndot.active{opacity:1;}
+.dot{width:6px;height:6px;border-radius:50%;}
+.dot.w{background:var(--wf);box-shadow:0 0 8px var(--wf);}
+.dot.b{background:var(--bf);box-shadow:0 0 8px var(--bf);}
+.caplist{font-size:1rem;min-height:22px;display:flex;flex-wrap:wrap;gap:2px;}
+.presslog{font-size:0.58rem;line-height:1.8;opacity:0.7;}
+.autorun-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;padding:8px 12px;border:1px solid var(--border);background:var(--panel);width:100%;margin-top:2px;}
+.ar-label{font-size:0.5rem;letter-spacing:0.2em;opacity:0.4;}
+.ar-btn{border-color:var(--gold)!important;color:var(--gold)!important;font-size:0.58rem;min-height:36px;padding:6px 14px;}
+.ar-btn.active{background:rgba(255,215,0,0.1);box-shadow:0 0 12px rgba(255,215,0,0.3);}
+.ar-input-wrap{display:flex;align-items:center;gap:4px;}
+.ar-input{width:70px;background:var(--bg);border:1px solid var(--border);color:var(--textbright);font-family:'Courier New',monospace;font-size:0.65rem;padding:4px 8px;text-align:right;}
+.ar-suffix{font-size:0.5rem;opacity:0.4;letter-spacing:0.1em;}
+.ar-progress-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:120px;}
+.ar-progress-track{flex:1;height:4px;background:var(--neutral);position:relative;overflow:hidden;}
+.ar-progress-fill{height:100%;background:var(--gold);box-shadow:0 0 8px var(--gold);transition:width 0.3s ease;}
+.ar-progress-label{font-size:0.55rem;color:var(--gold);min-width:60px;text-align:right;font-variant-numeric:tabular-nums;}
+.ar-magic{font-size:0.5rem;letter-spacing:0.12em;opacity:0.6;}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="win-box" id="winBox">
+    <div class="win-tag">CHECK DOMINATION — VICTORY</div>
+    <div class="win-name" id="winName">WHITE</div>
+    <div class="win-detail" id="winDetail"></div>
+    <div class="win-merge" id="winMerge"></div>
+    <button class="win-btn" id="winBtn">NEXT GENERATION ▶</button>
+  </div>
+</div>
+
+<header>
+  <div>
+    <div class="title">PHASIC CHESS</div>
+    <div class="subtitle">ANGULAR PRESSURE FIELD ENGINE — PERSISTENT MEMORY + MERGE SYSTEM</div>
+  </div>
+  <div class="statusbar">
+    <div class="stat"><span class="stat-label">GENERATION</span><span class="stat-value" id="genNum">0</span></div>
+    <div class="stat"><span class="stat-label">WHITE WINS</span><span class="stat-value" id="wWins">0</span></div>
+    <div class="stat"><span class="stat-label">BLACK WINS</span><span class="stat-value" id="bWins">0</span></div>
+    <div class="stat">
+      <span class="stat-label">FIELD MEMORY</span>
+      <div class="mem-badge cold" id="memBadge"><div class="mem-dot" id="memDot"></div><span id="memStatus">NO MEMORY</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="checkbanner">
+  <div class="chkbox wc">
+    <div><div class="chk-lbl">WHITE CHECKS DELIVERED</div><div class="chk-sub">WIN AT 25</div></div>
+    <div class="chk-num" id="wCheckNum">0</div>
+    <div class="chk-track"><div class="chk-fill w" id="wCheckBar" style="width:0%"></div></div>
+  </div>
+  <div class="chkbox bc">
+    <div><div class="chk-lbl">BLACK CHECKS DELIVERED</div><div class="chk-sub">WIN AT 25</div></div>
+    <div class="chk-num" id="bCheckNum">0</div>
+    <div class="chk-track"><div class="chk-fill b" id="bCheckBar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="genbanner" style="margin-top:8px;">
+  <div class="genstat"><span>WHITE NODES</span><span id="wNodes">0</span></div>
+  <div class="genstat"><span>BLACK NODES</span><span id="bNodes">0</span></div>
+  <div class="genstat"><span>CRASHES</span><span id="totalCrashes">0</span></div>
+  <div class="genstat"><span>MOVE COUNT</span><span id="moveCount">0</span></div>
+  <div class="genstat"><span>MERGES DONE</span><span id="mergeCount">0</span></div>
+</div>
+
+<div class="main">
+  <div class="sidepanel">
+    <div class="panelbox ws">
+      <div class="paneltitle wt">WHITE KING — ANGULAR FIELD</div>
+      <div class="polarwrap"><canvas id="polarW" width="188" height="188"></canvas></div>
+      <div class="fbarwrap">
+        <div class="flabel"><span>DEGREES OF FREEDOM</span><span id="wFreedomPct">100%</span></div>
+        <div class="ftrack"><div class="ffill wfill" id="wFreedomBar" style="width:100%"></div></div>
+      </div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">CAPTURED BY WHITE</div>
+      <div class="caplist" id="wCaptured"></div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">FIELD PRESSURE LOG</div>
+      <div class="presslog">
+        <div>POS ZONES: <span id="wPos" style="color:var(--wf)">0</span></div>
+        <div>NEG ZONES: <span id="wNeg" style="color:var(--bf)">0</span></div>
+        <div>LAST MOVE: <span id="wAction" style="color:var(--textbright)">--</span></div>
+        <div>FREEDOM D: <span id="wDelta" style="color:var(--textbright)">--</span></div>
+        <div>THREAT LVL: <span id="wThreat" style="color:#ffcc00">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="centerwrap">
+    <div class="turnindicator">
+      <div class="turndot active" id="turnW"><div class="dot w"></div><span>WHITE</span></div>
+      <div class="turndot" id="turnB"><div class="dot b"></div><span>BLACK</span></div>
+    </div>
+    <div class="panelbox ws" style="width:100%">
+      <div class="paneltitle wt">DEBUG LOG</div>
+      <div id="debugLog" style="font-size:0.5rem;line-height:1.4;max-height:80px;overflow-y:auto;"></div>
+    </div>
+    <div id="board"></div>
+    <div class="controls">
+      <button class="btn primary" id="btnStart">START</button>
+      <button class="btn" id="btnPause" disabled>PAUSE</button>
+      <button class="btn danger" id="btnReset">RESET</button>
+      <button class="btn gold" id="btnClearMem">CLEAR MEMORY</button>
+      <div class="speedctl">
+        <span>SPEED</span>
+        <input type="range" id="speed" min="1" max="10" value="5">
+        <span id="speedVal">5</span>
+      </div>
+    </div>
+    <div class="autorun-bar" id="autorunBar">
+      <div class="ar-label">AUTO-RUN</div>
+      <button class="btn ar-btn" id="btnAutoRun">▶▶ RUN 700</button>
+      <div class="ar-input-wrap">
+        <input type="number" id="arTarget" value="700" min="1" max="99999" class="ar-input">
+        <span class="ar-suffix">GAMES</span>
+      </div>
+      <div class="ar-progress-wrap">
+        <div class="ar-progress-track"><div class="ar-progress-fill" id="arProgressFill" style="width:0%"></div></div>
+        <span class="ar-progress-label" id="arProgressLabel">—</span>
+      </div>
+      <div class="ar-magic">TARGET: <span id="arMagic" style="color:var(--gold)">6950</span></div>
+    </div>
+    <div style="width:100%">
+      <div style="font-size:0.5rem;letter-spacing:0.15em;opacity:0.4;margin-bottom:4px">GAME LOG</div>
+      <div class="logbox" id="gameLog"></div>
+    </div>
+  </div>
+
+  <div class="sidepanel">
+    <div class="panelbox bs">
+      <div class="paneltitle bk">BLACK KING — ANGULAR FIELD</div>
+      <div class="polarwrap"><canvas id="polarB" width="188" height="188"></canvas></div>
+      <div class="fbarwrap">
+        <div class="flabel"><span>DEGREES OF FREEDOM</span><span id="bFreedomPct">100%</span></div>
+        <div class="ftrack"><div class="ffill bfill" id="bFreedomBar" style="width:100%"></div></div>
+      </div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">CAPTURED BY BLACK</div>
+      <div class="caplist" id="bCaptured"></div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">FIELD PRESSURE LOG</div>
+      <div class="presslog">
+        <div>POS ZONES: <span id="bPos" style="color:var(--wf)">0</span></div>
+        <div>NEG ZONES: <span id="bNeg" style="color:var(--bf)">0</span></div>
+        <div>LAST MOVE: <span id="bAction" style="color:var(--textbright)">--</span></div>
+        <div>FREEDOM D: <span id="bDelta" style="color:var(--textbright)">--</span></div>
+        <div>THREAT LVL: <span id="bThreat" style="color:#ffcc00">--</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+var CHECK_WIN   = 25;
+var MERGE_RATIO = 0.35;  // winner knowledge bleeds into loser at this ratio
+var SK_W        = 'phasic:fieldW';
+var SK_B        = 'phasic:fieldB';
+var SK_META     = 'phasic:meta';
+
+// ═══════════════════════════════════════════════════════════
+// DEBUG
+// ═══════════════════════════════════════════════════════════
+function debug(msg){
+  var b=document.getElementById('debugLog');if(!b)return;
+  var d=document.createElement('div');
+  d.textContent=new Date().toLocaleTimeString()+' '+msg;
+  b.appendChild(d);b.scrollTop=b.scrollHeight;
+  while(b.children.length>50)b.removeChild(b.firstChild);
+}
+
+// ═══════════════════════════════════════════════════════════
+// STORAGE  (window.storage with localStorage fallback)
+// ═══════════════════════════════════════════════════════════
+async function sto_set(key,val){
+  var s=JSON.stringify(val);
+  try{if(window.storage){await window.storage.set(key,s);return;}}catch(e){}
+  try{localStorage.setItem(key,s);}catch(e){}
+}
+async function sto_get(key){
+  try{if(window.storage){var r=await window.storage.get(key);return r&&r.value?JSON.parse(r.value):null;}}catch(e){}
+  try{var v=localStorage.getItem(key);return v?JSON.parse(v):null;}catch(e){return null;}
+}
+async function sto_del(key){
+  try{if(window.storage){await window.storage.delete(key);return;}}catch(e){}
+  try{localStorage.removeItem(key);}catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASIC FIELD
+// ═══════════════════════════════════════════════════════════
+function PhasicField(name){this.name=name;this.field={};this.trajectory=[];}
+PhasicField.prototype.getKey=function(a,d){return(Math.round(a*10)/10)+'_'+(Math.floor(d/10)*10);};
+PhasicField.prototype.getResonance=function(a,d){return this.field[this.getKey(a,d)]||0;};
+PhasicField.prototype.dentField=function(ca,cd,impact){
+  var RA=0.4,RD=40;
+  for(var a=ca-RA;a<=ca+RA;a+=0.1){for(var d=cd-RD;d<=cd+RD;d+=10){
+    var da=Math.abs(a-ca)/RA,dd=Math.abs(d-cd)/RD,dist=Math.sqrt(da*da+dd*dd);
+    if(dist<=1){var w=(Math.cos(dist*Math.PI)+1)/2,k=this.getKey(a,d),v=(this.field[k]||0)+impact*w;this.field[k]=Math.max(-1,Math.min(1,v));}
+  }}
+};
+PhasicField.prototype.getPositiveCount=function(){var n=0,v=Object.values(this.field);for(var i=0;i<v.length;i++)if(v[i]>0.1)n++;return n;};
+PhasicField.prototype.getNegativeCount=function(){var n=0,v=Object.values(this.field);for(var i=0;i<v.length;i++)if(v[i]<-0.1)n++;return n;};
+PhasicField.prototype.getNodeCount=function(){return Object.keys(this.field).length;};
+PhasicField.prototype.clearTrajectory=function(){this.trajectory=[];};
+PhasicField.prototype.save=async function(key){await sto_set(key,{field:this.field});};
+PhasicField.prototype.load=async function(key){
+  var d=await sto_get(key);
+  if(d&&d.field){this.field=d.field;return true;}
+  return false;
+};
+// Merge winner's field into this (loser) field at given ratio
+// Each key in winner is blended: loser[k] = loser[k]*(1-r) + winner[k]*r
+// Keys only in loser are left untouched (loser retains its own memories)
+PhasicField.prototype.mergeFrom=function(winner,r){
+  var keys=Object.keys(winner.field);
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i];
+    var existing=this.field[k]||0;
+    this.field[k]=Math.max(-1,Math.min(1,existing*(1-r)+winner.field[k]*r));
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// PIECE TABLES
+// ═══════════════════════════════════════════════════════════
+var PIECES={wK:'\u2654',wQ:'\u2655',wR:'\u2656',wB:'\u2657',wN:'\u2658',wP:'\u2659',
+            bK:'\u265A',bQ:'\u265B',bR:'\u265C',bB:'\u265D',bN:'\u265E',bP:'\u265F'};
+var PIECE_VALUE     ={K:10,Q:9,R:5,B:3,N:3,P:1};
+var PIECE_RESISTANCE={K:3.0,Q:1.4,R:1.1,B:0.9,N:0.8,P:0.3};
+var PIECE_THREAT    ={K:0.5,Q:1.0,R:0.8,B:0.6,N:0.6,P:0.3};
+var THREAT_DECAY    =[1.0,0.65,0.35,0.15];
+
+// ═══════════════════════════════════════════════════════════
+// BOARD HELPERS
+// ═══════════════════════════════════════════════════════════
+function initialBoard(){
+  var b=[],back=['R','N','B','Q','K','B','N','R'];
+  for(var r=0;r<8;r++){b[r]=[];for(var f=0;f<8;f++)b[r][f]=null;}
+  for(var f=0;f<8;f++){b[0][f]={color:'b',type:back[f]};b[1][f]={color:'b',type:'P'};b[6][f]={color:'w',type:'P'};b[7][f]={color:'w',type:back[f]};}
+  return b;
+}
+function cloneBoard(b){
+  var nb=[];for(var r=0;r<8;r++){nb[r]=[];for(var f=0;f<8;f++)nb[r][f]=b[r][f]?{color:b[r][f].color,type:b[r][f].type}:null;}return nb;
+}
+function inBounds(r,f){return r>=0&&r<8&&f>=0&&f<8;}
+function getKingPos(board,color){
+  for(var r=0;r<8;r++)for(var f=0;f<8;f++)if(board[r][f]&&board[r][f].color===color&&board[r][f].type==='K')return[r,f];return null;
+}
+function isSquareAttacked(board,r,f,byColor){
+  var pd=byColor==='w'?1:-1;
+  for(var df=-1;df<=1;df+=2){var pr=r+pd,pf=f+df;if(inBounds(pr,pf)&&board[pr][pf]&&board[pr][pf].color===byColor&&board[pr][pf].type==='P')return true;}
+  var nm=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  for(var i=0;i<nm.length;i++){var nr=r+nm[i][0],nf=f+nm[i][1];if(inBounds(nr,nf)&&board[nr][nf]&&board[nr][nf].color===byColor&&board[nr][nf].type==='N')return true;}
+  for(var dr=-1;dr<=1;dr++)for(var df2=-1;df2<=1;df2++){if(!dr&&!df2)continue;var kr=r+dr,kf=f+df2;if(inBounds(kr,kf)&&board[kr][kf]&&board[kr][kf].color===byColor&&board[kr][kf].type==='K')return true;}
+  var st=[[0,1],[0,-1],[1,0],[-1,0]];
+  for(var i=0;i<st.length;i++){var cr=r+st[i][0],cf=f+st[i][1];while(inBounds(cr,cf)){var p=board[cr][cf];if(p){if(p.color===byColor&&(p.type==='R'||p.type==='Q'))return true;break;}cr+=st[i][0];cf+=st[i][1];}}
+  var dg=[[1,1],[1,-1],[-1,1],[-1,-1]];
+  for(var i=0;i<dg.length;i++){var cr=r+dg[i][0],cf=f+dg[i][1];while(inBounds(cr,cf)){var p=board[cr][cf];if(p){if(p.color===byColor&&(p.type==='B'||p.type==='Q'))return true;break;}cr+=dg[i][0];cf+=dg[i][1];}}
+  return false;
+}
+function isInCheck(board,color){var kp=getKingPos(board,color);if(!kp)return false;return isSquareAttacked(board,kp[0],kp[1],color==='w'?'b':'w');}
+function getPieceMoves(board,r,f,checkLegality){
+  var p=board[r][f];if(!p)return[];var moves=[],opp=p.color==='w'?'b':'w';
+  function tryAdd(tr,tf){
+    if(!inBounds(tr,tf))return;if(board[tr][tf]&&board[tr][tf].color===p.color)return;
+    if(checkLegality){var nb=cloneBoard(board);nb[tr][tf]=nb[r][f];nb[r][f]=null;if(!isInCheck(nb,p.color))moves.push([tr,tf]);}
+    else moves.push([tr,tf]);
+  }
+  function slide(dirs){for(var i=0;i<dirs.length;i++){var dr=dirs[i][0],df=dirs[i][1],cr=r+dr,cf=f+df;while(inBounds(cr,cf)){if(board[cr][cf]){if(board[cr][cf].color===opp)tryAdd(cr,cf);break;}tryAdd(cr,cf);cr+=dr;cf+=df;}}}
+  if(p.type==='P'){var dir=p.color==='w'?-1:1,start=p.color==='w'?6:1;if(inBounds(r+dir,f)&&!board[r+dir][f]){tryAdd(r+dir,f);if(r===start&&!board[r+dir][f]&&!board[r+2*dir][f])tryAdd(r+2*dir,f);}for(var df3=-1;df3<=1;df3+=2)if(inBounds(r+dir,f+df3)&&board[r+dir][f+df3]&&board[r+dir][f+df3].color===opp)tryAdd(r+dir,f+df3);}
+  else if(p.type==='N'){var nm2=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];for(var i=0;i<nm2.length;i++)tryAdd(r+nm2[i][0],f+nm2[i][1]);}
+  else if(p.type==='B')slide([[1,1],[1,-1],[-1,1],[-1,-1]]);
+  else if(p.type==='R')slide([[0,1],[0,-1],[1,0],[-1,0]]);
+  else if(p.type==='Q')slide([[1,1],[1,-1],[-1,1],[-1,-1],[0,1],[0,-1],[1,0],[-1,0]]);
+  else if(p.type==='K'){for(var dr=-1;dr<=1;dr++)for(var df4=-1;df4<=1;df4++)if(dr||df4)tryAdd(r+dr,f+df4);}
+  return moves;
+}
+function getAllMoves(board,color){
+  var moves=[];
+  for(var r=0;r<8;r++)for(var f=0;f<8;f++)if(board[r][f]&&board[r][f].color===color){var pm=getPieceMoves(board,r,f,true);for(var i=0;i<pm.length;i++)moves.push({from:[r,f],to:pm[i]});}
+  return moves;
+}
+function buildPressureField(board,color){
+  var kpos=getKingPos(board,color);if(!kpos)return{pressureMap:{},signals:[],kpos:null};
+  var kr=kpos[0],kf=kpos[1],opp=color==='w'?'b':'w',pressureMap={},sigs=[],abe={},abu={};
+  for(var pr=0;pr<8;pr++)for(var pf=0;pf<8;pf++){var p=board[pr][pf];if(!p)continue;var raw=getPieceMoves(board,pr,pf,false);for(var i=0;i<raw.length;i++){var key=raw[i][0]+'_'+raw[i][1];var tw=PIECE_THREAT[p.type]||0.5;if(p.color===opp)abe[key]=(abe[key]||0)+tw;else abu[key]=(abu[key]||0)+tw;}}
+  for(var pr=0;pr<8;pr++)for(var pf=0;pf<8;pf++){
+    var p=board[pr][pf];if(!p||(pr===kr&&pf===kf))continue;
+    var isFriendly=p.color===color,pieceVal=PIECE_VALUE[p.type]||1,emit=1.0;
+    if(isFriendly){var mk=pr+'_'+pf,ua=abe[mk]||0;if(ua>0){var def=(abu[mk]||0)>0;emit=def?Math.max(0.3,1-ua*0.4):Math.max(0.1,1-ua*0.7);}}
+    else{var ek=pr+'_'+pf,co=abu[ek]||0;if(co>0){emit=Math.max(0.2,1-co*0.5);var bdr=pf-kf,bdc=pr-kr;pressureMap['cap_'+pr+'_'+pf]=(co*(PIECE_THREAT[p.type]||0.5)*0.6);sigs.push({r:pr,f:pf,angle:Math.atan2(bdc,bdr),distance:Math.hypot(bdr,bdc)*30,isFriendly:true,type:p.type,val:pieceVal,isOpportunity:true});}}
+    var reachable=getPieceMoves(board,pr,pf,false);
+    for(var i=0;i<reachable.length;i++){var tr=reachable[i][0],tf=reachable[i][1],rk=tr+'_'+tf,w=isFriendly?(pieceVal/9)*emit:emit,dr=tf-kf,dc=tr-kr;pressureMap[rk]=(pressureMap[rk]||0)+(isFriendly?1:-1)*w;sigs.push({r:tr,f:tf,angle:Math.atan2(dc,dr),distance:Math.hypot(dr,dc)*30,isFriendly:isFriendly,type:p.type,val:pieceVal,threatened:(emit<0.7)});}
+  }
+  return{pressureMap:pressureMap,signals:sigs,kpos:kpos};
+}
+function computeKingFreedom(board,color,phasicField){
+  var kpos=getKingPos(board,color);if(!kpos)return{freedom:0,signals:[],pressureMap:{},kpos:null,kingMoves:0};
+  var kr=kpos[0],kf=kpos[1],pfr=buildPressureField(board,color),pm=pfr.pressureMap,sig=pfr.signals;
+  var kingMoves=getPieceMoves(board,kr,kf,true).length,moveFreedom=kingMoves/8,fieldScore=0,fieldCount=0;
+  var rawEsc=getPieceMoves(board,kr,kf,false);
+  for(var i=0;i<rawEsc.length;i++){var tr=rawEsc[i][0],tf=rawEsc[i][1],pressure=pm[tr+'_'+tf]||0,dr=tf-kf,dc=tr-kr;fieldScore+=pressure+phasicField.getResonance(Math.atan2(dc,dr),Math.hypot(dr,dc)*30)*0.5;fieldCount++;}
+  var avgField=fieldCount>0?fieldScore/fieldCount:0,kc=pm[kr+'_'+kf]||0;
+  var totalFreedom=Math.max(0,Math.min(1,0.5*moveFreedom+0.3*Math.max(0,Math.min(1,(avgField+1)/2))+0.2*Math.max(0,Math.min(1,(kc+1)/2))));
+  return{freedom:totalFreedom,moveFreedom:moveFreedom,kingMoves:kingMoves,signals:sig,pressureMap:pm,kpos:kpos};
+}
+function computeThreatCascade(board,color,phasicField){
+  var kpos=getKingPos(board,color);if(!kpos)return 0;
+  var kr=kpos[0],kf=kpos[1],opp=color==='w'?'b':'w',total=0;
+  for(var pr=0;pr<8;pr++)for(var pf=0;pf<8;pf++){
+    var p=board[pr][pf];if(!p||p.color!==opp)continue;
+    var tw=PIECE_THREAT[p.type]||0.5,reachable=getPieceMoves(board,pr,pf,false);
+    for(var i=0;i<reachable.length;i++){var tr=reachable[i][0],tf=reachable[i][1],dtk=Math.max(Math.abs(tr-kr),Math.abs(tf-kf));if(dtk<=4){var decay=THREAT_DECAY[dtk-1]||0.15,dr=tf-kf,dc=tr-kr,mem=phasicField.getResonance(Math.atan2(dc,dr),Math.hypot(dr,dc)*30),amp=mem<0?1+Math.abs(mem):1;total+=tw*decay*amp;}}
+  }
+  return total;
+}
+function scoreMove(board,color,move,phasicField,visitedSquares){
+  var nb=cloneBoard(board),opp=color==='w'?'b':'w';
+  var fr=move.from[0],ff=move.from[1],tr=move.to[0],tf=move.to[1];
+  var captured=nb[tr][tf],movingPiece=nb[fr][ff];if(!movingPiece)return -Infinity;
+  nb[tr][tf]=nb[fr][ff];nb[fr][ff]=null;
+  if(nb[tr][tf].type==='P'&&(tr===0||tr===7))nb[tr][tf].type='Q';
+  var kpos=getKingPos(nb,color);if(!kpos)return -Infinity;
+  var kr=kpos[0],kf=kpos[1],pfr=buildPressureField(nb,color),pm=pfr.pressureMap;
+  var resistance=PIECE_RESISTANCE[movingPiece.type]||1,score=0;
+  var tA=computeThreatCascade(nb,color,phasicField),tB=computeThreatCascade(board,color,phasicField);
+  score+=(tB-tA)*6;score-=tA*2;
+  var dua=isSquareAttacked(nb,tr,tf,opp),sua=isSquareAttacked(board,fr,ff,opp);
+  if(sua&&!dua)score+=(PIECE_VALUE[movingPiece.type]||1)*resistance*2;
+  if(!sua&&dua&&movingPiece.type!=='K')score-=(PIECE_VALUE[movingPiece.type]||1)*resistance*1.5;
+  if(movingPiece.type==='K'&&dua)score-=15;
+  if(captured)score+=PIECE_VALUE[captured.type]*3;
+  for(var er=0;er<8;er++)for(var ef=0;ef<8;ef++){var ep=nb[er][ef];if(!ep||ep.color!==opp)continue;if((pm['cap_'+er+'_'+ef]||0)>0)score+=PIECE_VALUE[ep.type]*0.4;}
+  if(isInCheck(nb,opp))score+=5;
+  var esc=getPieceMoves(nb,kr,kf,true);score+=esc.length*0.5;score+=(pm[kr+'_'+kf]||0)*1.5;
+  score-=(visitedSquares?(visitedSquares[kr+'_'+kf]||0):0)*4;
+  return score;
+}
+function applyCrash(field,signals,freedomLoss,kpos){
+  if(!kpos)return;var dk={};
+  for(var i=0;i<signals.length;i++){var s=signals[i],bk=field.getKey(s.angle,s.distance);if(dk[bk])continue;dk[bk]=true;var tw=PIECE_THREAT[s.type]||0.5;field.dentField(s.angle,s.distance,s.isFriendly?freedomLoss*0.25*tw:-freedomLoss*0.5*tw);}
+}
+
+// ═══════════════════════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════════════════════
+function freshState(){
+  return{board:initialBoard(),turn:'w',moveCount:0,firstMoveW:true,firstMoveB:true,
+    gameOver:false,wCaptured:[],bCaptured:[],wFreedom:1,bFreedom:1,
+    wLastMove:null,bLastMove:null,wVisited:{},bVisited:{},
+    wChecks:0,bChecks:0};
+}
+var state      = freshState();
+var fieldW     = new PhasicField('White');
+var fieldB     = new PhasicField('Black');
+var generations   = 0;
+var totalCrashes  = 0;
+var wWins = 0, bWins = 0, mergesDone = 0;
+var running    = false;
+var intervalId = null;
+// Auto-run
+var autoRunActive    = false;
+var autoRunTarget    = 700;
+var autoRunStartGen  = 0;
+var SAVE_EVERY       = 25;  // persist to storage every N games during auto-run
+
+// ═══════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════
+function renderBoard(){
+  var boardEl=document.getElementById('board');if(!boardEl)return;boardEl.innerHTML='';
+  var ranks=['8','7','6','5','4','3','2','1'],files=['a','b','c','d','e','f','g','h'];
+  var wCheck=isInCheck(state.board,'w'),bCheck=isInCheck(state.board,'b');
+  var wFrom=state.wLastMove?(state.wLastMove.from[0]+'_'+state.wLastMove.from[1]):null;
+  var wTo  =state.wLastMove?(state.wLastMove.to[0]  +'_'+state.wLastMove.to[1]  ):null;
+  var bFrom=state.bLastMove?(state.bLastMove.from[0]+'_'+state.bLastMove.from[1]):null;
+  var bTo  =state.bLastMove?(state.bLastMove.to[0]  +'_'+state.bLastMove.to[1]  ):null;
+  for(var r=0;r<8;r++)for(var f=0;f<8;f++){
+    var cell=document.createElement('div'),rfs=r+'_'+f;
+    cell.className='cell '+((r+f)%2===0?'light':'dark');
+    if(rfs===wFrom||rfs===wTo)cell.className+=' hlw';
+    if(rfs===bFrom||rfs===bTo)cell.className+=' hlb';
+    var p=state.board[r][f];
+    if(p){var span=document.createElement('span');span.textContent=PIECES[p.color+p.type];span.className='piece-'+p.color;if(p.type==='K'&&p.color==='w'&&wCheck)span.className+=' king-check';if(p.type==='K'&&p.color==='b'&&bCheck)span.className+=' king-check';cell.appendChild(span);}
+    if(f===7){var c=document.createElement('span');c.className='coord coord-rank';c.textContent=ranks[r];cell.appendChild(c);}
+    if(r===7){var c=document.createElement('span');c.className='coord coord-file';c.textContent=files[f];cell.appendChild(c);}
+    boardEl.appendChild(cell);
+  }
+}
+function renderPolarField(canvasId,field){
+  var canvas=document.getElementById(canvasId);if(!canvas)return;
+  var ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,R=W/2-8;
+  ctx.clearRect(0,0,W,H);ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle='#060f18';ctx.fill();
+  ctx.strokeStyle='#0d2233';ctx.lineWidth=0.5;
+  for(var i=1;i<=4;i++){ctx.beginPath();ctx.arc(cx,cy,R*i/4,0,Math.PI*2);ctx.stroke();}
+  for(var a=0;a<Math.PI*2;a+=Math.PI/6){ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);ctx.stroke();}
+  var isW=canvasId==='polarW',keys=Object.keys(field.field);
+  for(var i=0;i<keys.length;i++){
+    var val=field.field[keys[i]];if(Math.abs(val)<0.05)continue;
+    var parts=keys[i].split('_'),fa=parseFloat(parts[0]),fd=parseFloat(parts[1])/200;
+    var radius=Math.min(fd,1)*R,alpha=Math.abs(val)*0.6;
+    ctx.fillStyle=val>0?('rgba(0,229,255,'+alpha+')'):'rgba(255,61,110,'+alpha+')';
+    ctx.beginPath();ctx.arc(cx+Math.cos(fa)*radius,cy+Math.sin(fa)*radius,2.5,0,Math.PI*2);ctx.fill();
+  }
+  ctx.shadowBlur=12;ctx.shadowColor=isW?'#00e5ff':'#ff3d6e';
+  ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle=isW?'#00e5ff':'#ff3d6e';ctx.fill();
+  ctx.shadowBlur=0;ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.strokeStyle=isW?'rgba(0,229,255,0.25)':'rgba(255,61,110,0.25)';ctx.lineWidth=1;ctx.stroke();
+}
+function el(id){return document.getElementById(id);}
+function updateUI(){
+  var wPct=Math.round(state.wFreedom*100),bPct=Math.round(state.bFreedom*100);
+  if(el('wFreedomPct'))el('wFreedomPct').textContent=wPct+'%';
+  if(el('wFreedomBar'))el('wFreedomBar').style.width=wPct+'%';
+  if(el('bFreedomPct'))el('bFreedomPct').textContent=bPct+'%';
+  if(el('bFreedomBar'))el('bFreedomBar').style.width=bPct+'%';
+  if(el('wNodes'))el('wNodes').textContent=fieldW.getNodeCount();
+  if(el('bNodes'))el('bNodes').textContent=fieldB.getNodeCount();
+  if(el('wPos'))el('wPos').textContent=fieldW.getPositiveCount();
+  if(el('wNeg'))el('wNeg').textContent=fieldW.getNegativeCount();
+  if(el('bPos'))el('bPos').textContent=fieldB.getPositiveCount();
+  if(el('bNeg'))el('bNeg').textContent=fieldB.getNegativeCount();
+  if(el('genNum'))el('genNum').textContent=generations;
+  if(el('wWins'))el('wWins').textContent=wWins;
+  if(el('bWins'))el('bWins').textContent=bWins;
+  if(el('totalCrashes'))el('totalCrashes').textContent=totalCrashes;
+  if(el('moveCount'))el('moveCount').textContent=state.moveCount;
+  if(el('mergeCount'))el('mergeCount').textContent=mergesDone;
+  var wc=state.wChecks,bc=state.bChecks;
+  if(el('wCheckNum'))el('wCheckNum').textContent=wc;
+  if(el('bCheckNum'))el('bCheckNum').textContent=bc;
+  if(el('wCheckBar'))el('wCheckBar').style.width=Math.min(100,(wc/CHECK_WIN)*100)+'%';
+  if(el('bCheckBar'))el('bCheckBar').style.width=Math.min(100,(bc/CHECK_WIN)*100)+'%';
+  if(el('wCaptured'))el('wCaptured').textContent=state.wCaptured.map(function(t){return PIECES['b'+t]||'';}).join('');
+  if(el('bCaptured'))el('bCaptured').textContent=state.bCaptured.map(function(t){return PIECES['w'+t]||'';}).join('');
+}
+function log(msg,cls){
+  var box=document.getElementById('gameLog');if(!box)return;
+  var div=document.createElement('div');div.className='log-entry '+(cls||'');div.textContent=msg;
+  box.appendChild(div);box.scrollTop=box.scrollHeight;
+  while(box.children.length>120)box.removeChild(box.firstChild);
+}
+function updateMemoryBadge(hasData){
+  var badge=el('memBadge'),dot=el('memDot'),status=el('memStatus');if(!badge)return;
+  if(hasData){badge.className='mem-badge live';dot.className='mem-dot pulse';status.textContent='W:'+fieldW.getNodeCount()+' B:'+fieldB.getNodeCount()+' NODES';}
+  else{badge.className='mem-badge cold';dot.className='mem-dot';status.textContent='NO MEMORY';}
+}
+
+// ═══════════════════════════════════════════════════════════
+// WIN + FIELD MERGE
+// ═══════════════════════════════════════════════════════════
+async function handleWin(winnerColor){
+  var loserColor  = winnerColor==='w'?'b':'w';
+  var winField    = winnerColor==='w'?fieldW:fieldB;
+  var loseField   = winnerColor==='w'?fieldB:fieldW;
+  var winName     = winnerColor==='w'?'WHITE':'BLACK';
+  var loseName    = winnerColor==='w'?'BLACK':'WHITE';
+
+  // Merge winner's learned field into the loser's field
+  var preNodes = loseField.getNodeCount();
+  loseField.mergeFrom(winField, MERGE_RATIO);
+  mergesDone++;
+
+  log('✦ MERGE: '+winName+'→'+loseName+' nodes:'+preNodes+'→'+loseField.getNodeCount(),'merge');
+
+  // In auto-run: skip overlay, save periodically, roll straight into next gen
+  if(autoRunActive){
+    var gamesRun = generations - autoRunStartGen;
+    // Save every SAVE_EVERY games
+    if(gamesRun % SAVE_EVERY === 0){
+      await fieldW.save(SK_W);
+      await fieldB.save(SK_B);
+      await sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins,totalCrashes:totalCrashes,mergesDone:mergesDone});
+      updateMemoryBadge(true);
+      log('💾 AUTO-SAVED at gen '+generations,'merge');
+    }
+    updateAutoRunProgress();
+    // Check if we've hit the target
+    if(gamesRun >= autoRunTarget){
+      autoRunActive=false;
+      clearInterval(intervalId);running=false;
+      if(el('btnStart'))el('btnStart').disabled=false;
+      if(el('btnPause'))el('btnPause').disabled=true;
+      if(el('btnAutoRun'))el('btnAutoRun').classList.remove('active');
+      // Final save
+      await fieldW.save(SK_W);
+      await fieldB.save(SK_B);
+      await sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins,totalCrashes:totalCrashes,mergesDone:mergesDone});
+      updateMemoryBadge(true);
+      log('★★★ AUTO-RUN COMPLETE — '+gamesRun+' GAMES — GEN '+generations+' ★★★','win');
+      updateAutoRunProgress();
+      return;
+    }
+    // Auto-advance to next generation
+    endGeneration();
+    return;
+  }
+
+  // Manual mode: save every win and show overlay
+  await fieldW.save(SK_W);
+  await fieldB.save(SK_B);
+  await sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins,totalCrashes:totalCrashes,mergesDone:mergesDone});
+  updateMemoryBadge(true);
+
+  var overlay=el('overlay'),winBox=el('winBox');
+  if(overlay&&winBox){
+    winBox.className='win-box '+(winnerColor==='w'?'ww':'bw');
+    el('winName').textContent=winName;
+    el('winDetail').textContent=state[winnerColor+'Checks']+' CHECKS  ·  GEN '+generations;
+    el('winMerge').textContent='✦ '+winName+' FIELD MERGED INTO '+loseName+' AT '+Math.round(MERGE_RATIO*100)+'%';
+    overlay.classList.add('show');
+  }
+  clearInterval(intervalId);running=false;
+  if(el('btnStart'))el('btnStart').disabled=false;
+  if(el('btnPause'))el('btnPause').disabled=true;
+}
+
+function updateAutoRunProgress(){
+  var gamesRun = Math.max(0, generations - autoRunStartGen);
+  var pct = autoRunActive ? Math.min(100,(gamesRun/autoRunTarget)*100) : (gamesRun>=autoRunTarget?100:0);
+  if(el('arProgressFill'))el('arProgressFill').style.width=pct+'%';
+  if(el('arProgressLabel')){
+    if(autoRunActive||gamesRun>0)el('arProgressLabel').textContent=gamesRun+'/'+autoRunTarget;
+    else el('arProgressLabel').textContent='—';
+  }
+  // Update button label
+  if(el('btnAutoRun')){
+    var tgt=parseInt(el('arTarget').value)||700;
+    el('btnAutoRun').textContent=autoRunActive?('■ STOP ('+gamesRun+')'):'▶▶ RUN '+tgt;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// GAME TICK
+// ═══════════════════════════════════════════════════════════
+function doTick(){
+  if(state.gameOver){endGeneration();return;}
+  var color=state.turn,opp=color==='w'?'b':'w',field=color==='w'?fieldW:fieldB;
+  var isFirst=color==='w'?state.firstMoveW:state.firstMoveB;
+  var allMoves=getAllMoves(state.board,color);
+  if(allMoves.length===0){
+    log(isInCheck(state.board,color)?'CHECKMATE — '+opp.toUpperCase()+' WINS':'STALEMATE','important check');
+    state.gameOver=true;
+    // In auto-run, a draw still advances
+    if(autoRunActive){
+      var gamesRun=generations-autoRunStartGen;
+      if(gamesRun>=autoRunTarget){
+        autoRunActive=false;clearInterval(intervalId);running=false;
+        if(el('btnStart'))el('btnStart').disabled=false;if(el('btnPause'))el('btnPause').disabled=true;
+        if(el('btnAutoRun'))el('btnAutoRun').classList.remove('active');
+        log('★★★ AUTO-RUN COMPLETE — '+gamesRun+' GAMES ★★★','win');
+        fieldW.save(SK_W);fieldB.save(SK_B);
+        sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins,totalCrashes:totalCrashes,mergesDone:mergesDone});
+        updateMemoryBadge(true);updateAutoRunProgress();
+      } else { updateAutoRunProgress(); }
+    }
+    return;
+  }
+  var chosenMove;
+  if(isFirst){
+    chosenMove=allMoves[Math.floor(Math.random()*Math.min(18,allMoves.length))];
+    if(color==='w')state.firstMoveW=false;else state.firstMoveB=false;
+    log(color.toUpperCase()+' RANDOM DISTURBANCE',color==='w'?'w-event':'b-event');
+  } else {
+    var vs=color==='w'?state.wVisited:state.bVisited,best=-Infinity;
+    for(var i=0;i<allMoves.length;i++){var s=scoreMove(state.board,color,allMoves[i],field,vs);if(s>best){best=s;chosenMove=allMoves[i];}}
+  }
+  if(!chosenMove){log('ERROR: No move','important');state.gameOver=true;return;}
+
+  var preF=computeKingFreedom(state.board,color,field);
+  var captured=state.board[chosenMove.to[0]][chosenMove.to[1]];
+  state.board[chosenMove.to[0]][chosenMove.to[1]]=state.board[chosenMove.from[0]][chosenMove.from[1]];
+  state.board[chosenMove.from[0]][chosenMove.from[1]]=null;
+  if(state.board[chosenMove.to[0]][chosenMove.to[1]].type==='P'&&(chosenMove.to[0]===0||chosenMove.to[0]===7)){
+    state.board[chosenMove.to[0]][chosenMove.to[1]].type='Q';
+    log(color.toUpperCase()+' PAWN PROMOTED',color==='w'?'w-event':'b-event');
+  }
+  var kposNow=getKingPos(state.board,color);
+  if(kposNow){var vKey=kposNow[0]+'_'+kposNow[1];var vs2=color==='w'?state.wVisited:state.bVisited;vs2[vKey]=(vs2[vKey]||0)+1;}
+  if(captured){
+    if(color==='w')state.wCaptured.push(captured.type);else state.bCaptured.push(captured.type);
+    var cnames={K:'KING',Q:'QUEEN',R:'ROOK',B:'BISHOP',N:'KNIGHT',P:'PAWN'};
+    log(color.toUpperCase()+' CAPTURES '+cnames[captured.type]+' +'+PIECE_VALUE[captured.type],color==='w'?'w-event':'b-event');
+    if(kposNow){var cdr=chosenMove.to[1]-kposNow[1],cdc=chosenMove.to[0]-kposNow[0];field.dentField(Math.atan2(cdc,cdr),Math.hypot(cdr,cdc)*30,PIECE_VALUE[captured.type]*0.08);}
+    if(captured.type==='K'){
+      log(color.toUpperCase()+' CAPTURES THE KING','important check');
+      state.gameOver=true;if(color==='w')wWins++;else bWins++;
+      handleWin(color);return;
+    }
+  }
+  var postF=computeKingFreedom(state.board,color,field);
+  var postThreat=computeThreatCascade(state.board,color,field);
+  var fd=postF.freedom-preF.freedom;
+  var files2=['a','b','c','d','e','f','g','h'];
+  var ms=files2[chosenMove.from[1]]+(8-chosenMove.from[0])+'→'+files2[chosenMove.to[1]]+(8-chosenMove.to[0]);
+  if(color==='w'){state.wFreedom=postF.freedom;if(el('wAction'))el('wAction').textContent=ms;if(el('wDelta'))el('wDelta').textContent=(fd>=0?'+':'')+fd.toFixed(3);if(el('wThreat'))el('wThreat').textContent=postThreat.toFixed(2);state.wLastMove=chosenMove;}
+  else{state.bFreedom=postF.freedom;if(el('bAction'))el('bAction').textContent=ms;if(el('bDelta'))el('bDelta').textContent=(fd>=0?'+':'')+fd.toFixed(3);if(el('bThreat'))el('bThreat').textContent=postThreat.toFixed(2);state.bLastMove=chosenMove;}
+
+  // ── CHECK DETECTION & WIN CONDITION ─────────────────────
+  if(isInCheck(state.board,opp)){
+    if(color==='w')state.wChecks++;else state.bChecks++;
+    log(color.toUpperCase()+' CHECKS '+opp.toUpperCase()+' [W:'+state.wChecks+' B:'+state.bChecks+']','check');
+    var oppField=opp==='w'?fieldW:fieldB;
+    var oppKpos=getKingPos(state.board,opp);
+    if(oppKpos){var ca=Math.atan2(chosenMove.to[0]-oppKpos[0],chosenMove.to[1]-oppKpos[1]);oppField.dentField(ca,30,-0.5);}
+    // Check win threshold
+    if(state.wChecks>=CHECK_WIN||state.bChecks>=CHECK_WIN){
+      var winner=state.wChecks>=CHECK_WIN?'w':'b';
+      log('★ '+(winner==='w'?'WHITE':'BLACK')+' WINS BY CHECK DOMINATION!','win');
+      state.gameOver=true;if(winner==='w')wWins++;else bWins++;
+      renderBoard();renderPolarField('polarW',fieldW);renderPolarField('polarB',fieldB);updateUI();
+      handleWin(winner);return;
+    }
+  }
+
+  if(fd<-0.08){applyCrash(field,preF.signals,Math.abs(fd),preF.kpos);totalCrashes++;}
+  state.moveCount++;state.turn=opp;
+  if(el('turnW'))el('turnW').classList.toggle('active',state.turn==='w');
+  if(el('turnB'))el('turnB').classList.toggle('active',state.turn==='b');
+  if(state.moveCount>600){
+    log('DRAW — MAX MOVES REACHED','important');
+    state.gameOver=true;
+    if(autoRunActive){
+      var gamesRun=generations-autoRunStartGen;
+      if(gamesRun>=autoRunTarget){
+        autoRunActive=false;clearInterval(intervalId);running=false;
+        if(el('btnStart'))el('btnStart').disabled=false;if(el('btnPause'))el('btnPause').disabled=true;
+        if(el('btnAutoRun'))el('btnAutoRun').classList.remove('active');
+        log('★★★ AUTO-RUN COMPLETE — '+gamesRun+' GAMES ★★★','win');
+        fieldW.save(SK_W);fieldB.save(SK_B);
+        sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins,totalCrashes:totalCrashes,mergesDone:mergesDone});
+        updateMemoryBadge(true);updateAutoRunProgress();
+      } else { updateAutoRunProgress(); }
+    }
+  }
+  renderBoard();renderPolarField('polarW',fieldW);renderPolarField('polarB',fieldB);updateUI();
+}
+
+// ═══════════════════════════════════════════════════════════
+// GENERATION MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+function endGeneration(){
+  generations++;
+  log('── GEN '+generations+' END · MOVES: '+state.moveCount+' ──','important');
+  fieldW.clearTrajectory();fieldB.clearTrajectory();
+  state=freshState();renderBoard();updateUI();
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',async function(){
+  debug('Loading persistent field memory...');
+  var wLoaded=await fieldW.load(SK_W);
+  var bLoaded=await fieldB.load(SK_B);
+  var meta=await sto_get(SK_META);
+  if(meta){generations=meta.generations||0;wWins=meta.wWins||0;bWins=meta.bWins||0;totalCrashes=meta.totalCrashes||0;mergesDone=meta.mergesDone||0;}
+  var hasMemory=wLoaded||bLoaded;
+  updateMemoryBadge(hasMemory);
+  if(hasMemory){
+    log('✦ PERSISTENT MEMORY LOADED','merge');
+    log('  W:'+fieldW.getNodeCount()+' nodes  B:'+fieldB.getNodeCount()+' nodes','merge');
+    log('  GEN:'+generations+' MERGES:'+mergesDone+' W-WINS:'+wWins+' B-WINS:'+bWins,'merge');
+  }
+
+  function getMs(){return Math.max(50,Math.round(800/(parseInt(el('speed')?el('speed').value:'5')||5)));}
+
+  if(el('btnStart'))el('btnStart').addEventListener('click',function(){
+    if(running)return;running=true;this.disabled=true;if(el('btnPause'))el('btnPause').disabled=false;
+    if(intervalId)clearInterval(intervalId);
+    intervalId=setInterval(doTick,getMs());log('▶ PHASIC ENGINE STARTED','important');
+  });
+  if(el('btnPause'))el('btnPause').addEventListener('click',function(){
+    if(!running)return;running=false;clearInterval(intervalId);
+    if(el('btnStart'))el('btnStart').disabled=false;this.disabled=true;log('‖ PAUSED','');
+  });
+  if(el('btnReset'))el('btnReset').addEventListener('click',function(){
+    clearInterval(intervalId);running=false;state=freshState();
+    if(el('btnStart'))el('btnStart').disabled=false;if(el('btnPause'))el('btnPause').disabled=true;
+    var gameLog=el('gameLog');if(gameLog)gameLog.innerHTML='';
+    renderBoard();renderPolarField('polarW',fieldW);renderPolarField('polarB',fieldB);updateUI();
+    log('↺ GAME RESET — FIELD MEMORY RETAINED','important');
+  });
+  if(el('btnClearMem'))el('btnClearMem').addEventListener('click',async function(){
+    clearInterval(intervalId);running=false;
+    generations=0;totalCrashes=0;wWins=0;bWins=0;mergesDone=0;
+    fieldW.field={};fieldW.trajectory=[];fieldB.field={};fieldB.trajectory=[];
+    await sto_del(SK_W);await sto_del(SK_B);await sto_del(SK_META);
+    state=freshState();
+    if(el('btnStart'))el('btnStart').disabled=false;if(el('btnPause'))el('btnPause').disabled=true;
+    var gameLog=el('gameLog');if(gameLog)gameLog.innerHTML='';
+    updateMemoryBadge(false);
+    renderBoard();renderPolarField('polarW',fieldW);renderPolarField('polarB',fieldB);updateUI();
+    log('✕ ALL FIELD MEMORY WIPED — FRESH START','important');
+  });
+  if(el('speed'))el('speed').addEventListener('input',function(){
+    if(el('speedVal'))el('speedVal').textContent=this.value;
+    if(running){clearInterval(intervalId);intervalId=setInterval(doTick,getMs());}
+  });
+  if(el('winBtn'))el('winBtn').addEventListener('click',function(){
+    el('overlay').classList.remove('show');
+    endGeneration();
+  });
+
+  // AUTO-RUN
+  if(el('arTarget'))el('arTarget').addEventListener('input',function(){
+    var tgt=parseInt(this.value)||700;
+    if(el('btnAutoRun')&&!autoRunActive)el('btnAutoRun').textContent='▶▶ RUN '+tgt;
+  });
+  if(el('btnAutoRun'))el('btnAutoRun').addEventListener('click',function(){
+    if(autoRunActive){
+      // Stop auto-run
+      autoRunActive=false;
+      this.classList.remove('active');
+      this.textContent='▶▶ RUN '+(parseInt(el('arTarget').value)||700);
+      log('■ AUTO-RUN STOPPED AT GEN '+generations,'important');
+      return;
+    }
+    // Start auto-run
+    autoRunTarget = parseInt(el('arTarget').value)||700;
+    autoRunStartGen = generations;
+    autoRunActive = true;
+    this.classList.add('active');
+    this.textContent='■ STOP (0)';
+    log('▶▶ AUTO-RUN STARTED — TARGET: '+autoRunTarget+' GAMES FROM GEN '+generations,'win');
+    // Make sure engine is running
+    if(!running){
+      running=true;
+      if(el('btnStart'))el('btnStart').disabled=true;
+      if(el('btnPause'))el('btnPause').disabled=false;
+      if(intervalId)clearInterval(intervalId);
+      intervalId=setInterval(doTick,getMs());
+    }
+    updateAutoRunProgress();
+  });
+
+  renderBoard();renderPolarField('polarW',fieldW);renderPolarField('polarB',fieldB);updateUI();
+  log('✦ PHASIC CHESS INITIALISED','important');
+  log('  CHECK WIN LIMIT: '+CHECK_WIN+' | MERGE RATIO: '+Math.round(MERGE_RATIO*100)+'%','');
+  log('  FIELD MEMORY: '+(hasMemory?'ACTIVE':'EMPTY'),'');
+  log('  PRESS START TO BEGIN','');
+  debug('Init complete. W:'+fieldW.getNodeCount()+' B:'+fieldB.getNodeCount());
+});
+</script>
+</body>
+</html>
