@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SACK CHESS v6</title>
+<style>
+:root {
+  --bg:#020508;--panel:#060d12;--border:#0a1e2e;
+  --wf:#00e5ff;--bf:#ff3d6e;--gold:#ffd700;--green:#00ff88;
+  --text:#6aa8c4;--textbright:#c0e8f5;--neutral:#0f1e2a;
+  --boardlight:#0b1a24;--boarddark:#050e15;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Courier New','Lucida Console',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);pointer-events:none;z-index:1000;}
+
+header{width:100%;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#04101a 0%,transparent 100%);flex-wrap:wrap;gap:8px;}
+.title{font-size:0.95rem;font-weight:900;letter-spacing:0.35em;color:var(--textbright);text-shadow:0 0 18px rgba(0,229,255,0.4);}
+.subtitle{font-size:0.52rem;letter-spacing:0.2em;opacity:0.5;margin-top:2px;}
+.hdr-stats{display:flex;gap:12px;font-size:0.6rem;flex-wrap:wrap;align-items:flex-end;}
+.hstat{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.hstat-label{opacity:0.35;font-size:0.45rem;letter-spacing:0.15em;}
+.hstat-val{color:var(--textbright);}
+
+.checkbar{width:100%;max-width:1160px;padding:6px 14px;display:flex;gap:8px;}
+.chkbox{flex:1;padding:8px 14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;background:var(--panel);}
+.chkbox.wc{border-color:rgba(0,229,255,0.4);}
+.chkbox.bc{border-color:rgba(255,61,110,0.4);}
+.chk-lbl{font-size:0.48rem;letter-spacing:0.18em;opacity:0.5;}
+.chk-sub{font-size:0.4rem;opacity:0.28;letter-spacing:0.1em;margin-top:1px;}
+.chk-num{font-size:1.4rem;font-weight:900;}
+.chkbox.wc .chk-num{color:var(--wf);text-shadow:0 0 12px var(--wf);}
+.chkbox.bc .chk-num{color:var(--bf);text-shadow:0 0 12px var(--bf);}
+.chk-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--neutral);}
+.chk-fill{height:100%;transition:width 0.3s ease;}
+.chk-fill.w{background:var(--wf);box-shadow:0 0 6px var(--wf);}
+.chk-fill.b{background:var(--bf);box-shadow:0 0 6px var(--bf);}
+
+.statbar{width:100%;max-width:1160px;padding:0 14px;display:flex;gap:8px;font-size:0.55rem;letter-spacing:0.08em;flex-wrap:wrap;}
+.genstat{flex:1;min-width:80px;background:var(--panel);border:1px solid var(--border);padding:5px 10px;display:flex;justify-content:space-between;align-items:center;}
+.genstat span:last-child{color:var(--textbright);font-size:0.6rem;}
+
+.overlay{display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.win-box{border:1px solid var(--border);padding:40px 60px;text-align:center;background:var(--panel);position:relative;overflow:hidden;max-width:460px;}
+.win-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.win-box.ww::before{background:var(--wf);box-shadow:0 0 20px var(--wf);}
+.win-box.bw::before{background:var(--bf);box-shadow:0 0 20px var(--bf);}
+.win-tag{font-size:0.48rem;letter-spacing:0.38em;opacity:0.4;margin-bottom:8px;}
+.win-name{font-size:2.2rem;font-weight:900;letter-spacing:0.22em;margin-bottom:5px;}
+.win-box.ww .win-name{color:var(--wf);text-shadow:0 0 28px var(--wf);}
+.win-box.bw .win-name{color:var(--bf);text-shadow:0 0 28px var(--bf);}
+.win-detail{font-size:0.55rem;opacity:0.5;letter-spacing:0.15em;line-height:1.8;}
+.win-chain{font-size:0.52rem;color:var(--green);margin-top:8px;letter-spacing:0.1em;opacity:0.85;line-height:1.6;}
+.win-btn{margin-top:22px;font-family:'Courier New',monospace;font-size:0.58rem;letter-spacing:0.18em;padding:12px 30px;background:transparent;border:1px solid var(--wf);color:var(--wf);cursor:pointer;}
+
+.main{display:grid;grid-template-columns:200px 1fr 200px;gap:12px;padding:12px 14px;width:100%;max-width:1160px;align-items:start;}
+@media(max-width:780px){.main{grid-template-columns:1fr;}}
+.sidepanel{display:flex;flex-direction:column;gap:10px;}
+.panelbox{background:var(--panel);border:1px solid var(--border);padding:10px;position:relative;overflow:hidden;}
+.panelbox::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+.panelbox.ws::before{background:var(--wf);box-shadow:0 0 8px var(--wf);}
+.panelbox.bs::before{background:var(--bf);box-shadow:0 0 8px var(--bf);}
+.paneltitle{font-size:0.52rem;letter-spacing:0.2em;margin-bottom:7px;opacity:0.55;}
+.paneltitle.wt{color:var(--wf);}
+.paneltitle.bk{color:var(--bf);}
+
+.cortexwrap{display:flex;align-items:center;justify-content:center;}
+.cortexwrap canvas{width:100%;max-width:180px;height:auto;}
+.fbarwrap{margin-top:6px;}
+.flabel{font-size:0.52rem;letter-spacing:0.1em;opacity:0.45;margin-bottom:3px;display:flex;justify-content:space-between;}
+.ftrack{height:3px;background:var(--neutral);position:relative;overflow:hidden;}
+.ffill{height:100%;transition:width 0.4s ease;}
+.wfill{background:var(--wf);box-shadow:0 0 6px var(--wf);}
+.bfill{background:var(--bf);box-shadow:0 0 6px var(--bf);}
+
+.caplist{font-size:0.9rem;min-height:20px;display:flex;flex-wrap:wrap;gap:2px;}
+.presslog{font-size:0.54rem;line-height:1.75;opacity:0.65;}
+
+.neuron-bars{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;margin-top:4px;align-items:end;height:32px;}
+.n-bar{width:100%;border-radius:1px 1px 0 0;background:var(--neutral);transition:all 0.35s;}
+
+.logbox{background:var(--panel);border:1px solid var(--border);padding:8px;height:140px;overflow-y:auto;font-size:0.56rem;line-height:1.65;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.log-entry{opacity:0.65;}
+.log-entry.important{opacity:1;color:var(--textbright);}
+.log-entry.w-event{color:var(--wf);}
+.log-entry.b-event{color:var(--bf);}
+.log-entry.check{color:#ffcc00;}
+.log-entry.win{color:var(--gold);}
+.log-entry.chain{color:var(--green);}
+
+.centerwrap{display:flex;flex-direction:column;align-items:center;gap:8px;}
+#board{display:grid;grid-template-columns:repeat(8,1fr);border:1px solid var(--border);}
+.cell{width:calc(min(50vw,460px)/8);height:calc(min(50vw,460px)/8);display:flex;align-items:center;justify-content:center;position:relative;font-size:clamp(0.9rem,3.2vw,1.7rem);cursor:default;}
+.cell.light{background:var(--boardlight);}
+.cell.dark{background:var(--boarddark);}
+.cell.hlw{box-shadow:inset 0 0 0 2px var(--wf);background:rgba(0,229,255,0.07)!important;}
+.cell.hlb{box-shadow:inset 0 0 0 2px var(--bf);background:rgba(255,61,110,0.07)!important;}
+.piece-w,.piece-b{font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Arial Unicode MS',serif;line-height:1;display:block;}
+.piece-w{text-shadow:0 0 10px var(--wf),0 0 18px rgba(0,229,255,0.4);filter:drop-shadow(0 0 3px rgba(0,229,255,0.5));}
+.piece-b{text-shadow:0 0 10px var(--bf),0 0 18px rgba(255,61,110,0.4);filter:drop-shadow(0 0 3px rgba(255,61,110,0.5));}
+.king-check{animation:checkpulse 0.5s infinite alternate;}
+@keyframes checkpulse{from{filter:drop-shadow(0 0 5px #ffcc00);}to{filter:drop-shadow(0 0 18px #ffcc00);}}
+.coord{position:absolute;font-size:0.38rem;opacity:0.18;}
+.coord-rank{bottom:1px;right:2px;}
+.coord-file{top:1px;left:2px;}
+
+.controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:center;}
+.btn{font-family:'Courier New','Lucida Console',monospace;font-size:0.56rem;letter-spacing:0.14em;padding:9px 14px;min-height:40px;background:transparent;border:1px solid var(--border);color:var(--text);cursor:pointer;transition:border-color 0.2s,color 0.2s;}
+.btn:hover{border-color:var(--textbright);color:var(--textbright);}
+.btn.primary{border-color:var(--wf);color:var(--wf);}
+.btn.danger{border-color:var(--bf);color:var(--bf);}
+.btn.gold{border-color:var(--gold);color:var(--gold);font-size:0.5rem;}
+.btn:disabled{opacity:0.25;cursor:not-allowed;}
+.speedctl{display:flex;align-items:center;gap:5px;font-size:0.56rem;}
+.speedctl input{width:65px;accent-color:var(--wf);}
+.turnindicator{display:flex;gap:16px;font-size:0.58rem;letter-spacing:0.14em;}
+.turndot{display:flex;align-items:center;gap:5px;opacity:0.35;transition:opacity 0.3s;}
+.turndot.active{opacity:1;}
+.dot{width:5px;height:5px;border-radius:50%;}
+.dot.w{background:var(--wf);box-shadow:0 0 7px var(--wf);}
+.dot.b{background:var(--bf);box-shadow:0 0 7px var(--bf);}
+
+.autorun-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;padding:7px 10px;border:1px solid var(--border);background:var(--panel);width:100%;margin-top:2px;}
+.ar-label{font-size:0.46rem;letter-spacing:0.2em;opacity:0.35;}
+.ar-btn{border-color:var(--gold)!important;color:var(--gold)!important;font-size:0.54rem;min-height:34px;padding:5px 12px;}
+.ar-btn.active{background:rgba(255,215,0,0.08);box-shadow:0 0 10px rgba(255,215,0,0.25);}
+.ar-input-wrap{display:flex;align-items:center;gap:3px;}
+.ar-input{width:65px;background:var(--bg);border:1px solid var(--border);color:var(--textbright);font-family:'Courier New',monospace;font-size:0.6rem;padding:3px 7px;text-align:right;}
+.ar-suffix{font-size:0.46rem;opacity:0.35;letter-spacing:0.08em;}
+.ar-progress-wrap{display:flex;align-items:center;gap:7px;flex:1;min-width:110px;}
+.ar-progress-track{flex:1;height:3px;background:var(--neutral);position:relative;overflow:hidden;}
+.ar-progress-fill{height:100%;background:var(--gold);box-shadow:0 0 6px var(--gold);transition:width 0.3s ease;}
+.ar-progress-label{font-size:0.5rem;color:var(--gold);min-width:55px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="win-box" id="winBox">
+    <div class="win-tag">SACK CHAIN VICTORY</div>
+    <div class="win-name" id="winName">WHITE</div>
+    <div class="win-detail" id="winDetail"></div>
+    <div class="win-chain" id="winChain"></div>
+    <button class="win-btn" id="winBtn">NEXT GENERATION ▶</button>
+  </div>
+</div>
+
+<header>
+  <div>
+    <div class="title">SACK CHESS v6</div>
+    <div class="subtitle">GO BACKEND · SPIRAL CORTEX · THREAT FUNNEL · INDEPENDENT FIELDS</div>
+  </div>
+  <div class="hdr-stats">
+    <div class="hstat"><span class="hstat-label">GEN</span><span class="hstat-val" id="genNum">0</span></div>
+    <div class="hstat"><span class="hstat-label">W WINS</span><span class="hstat-val" id="wWins">0</span></div>
+    <div class="hstat"><span class="hstat-label">B WINS</span><span class="hstat-val" id="bWins">0</span></div>
+    <div class="hstat"><span class="hstat-label">CHAINS</span><span class="hstat-val" id="totalChains">0</span></div>
+  </div>
+</header>
+
+<div class="checkbar">
+  <div class="chkbox wc">
+    <div><div class="chk-lbl">WHITE CHECKS</div><div class="chk-sub">WIN AT 25</div></div>
+    <div class="chk-num" id="wCheckNum">0</div>
+    <div class="chk-track"><div class="chk-fill w" id="wCheckBar" style="width:0%"></div></div>
+  </div>
+  <div class="chkbox bc">
+    <div><div class="chk-lbl">BLACK CHECKS</div><div class="chk-sub">WIN AT 25</div></div>
+    <div class="chk-num" id="bCheckNum">0</div>
+    <div class="chk-track"><div class="chk-fill b" id="bCheckBar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="statbar" style="margin-top:6px;">
+  <div class="genstat"><span>W NEURONS</span><span id="wNeurons">64</span></div>
+  <div class="genstat"><span>B NEURONS</span><span id="bNeurons">64</span></div>
+  <div class="genstat"><span>CHAIN LEN</span><span id="chainLen">0</span></div>
+  <div class="genstat"><span>W CHAINS</span><span id="wChains">0</span></div>
+  <div class="genstat"><span>B CHAINS</span><span id="bChains">0</span></div>
+  <div class="genstat"><span>MOVES</span><span id="moveCount">0</span></div>
+</div>
+
+<div class="main">
+  <!-- WHITE SIDE -->
+  <div class="sidepanel">
+    <div class="panelbox ws">
+      <div class="paneltitle wt">WHITE — SPIRAL CORTEX</div>
+      <div class="cortexwrap"><canvas id="cortexW" width="180" height="180"></canvas></div>
+      <div class="fbarwrap">
+        <div class="flabel"><span>FREEDOM</span><span id="wFreedomPct">100%</span></div>
+        <div class="ftrack"><div class="ffill wfill" id="wFreedomBar" style="width:100%"></div></div>
+      </div>
+      <div style="margin-top:4px;font-size:0.42rem;opacity:0.35;letter-spacing:0.1em;">
+        COIL: <span id="wCoilActive">—</span>
+      </div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">SACK NEURONS — WHITE</div>
+      <div class="neuron-bars" id="wNeuronBars"></div>
+      <div style="margin-top:5px;font-size:0.48rem;opacity:0.4;letter-spacing:0.1em;">
+        ACT:<span id="wActive">0</span> DEAD:<span id="wDead">0</span> CONF:<span id="wConf">0.000</span>
+      </div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">CAPTURED BY WHITE</div>
+      <div class="caplist" id="wCaptured"></div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">SIGNAL</div>
+      <div class="presslog">
+        <div>MOVE: <span id="wAction" style="color:var(--textbright)">--</span></div>
+        <div>ΔFREEDOM: <span id="wDelta" style="color:var(--textbright)">--</span></div>
+        <div>THREAT: <span id="wThreat" style="color:#ffcc00">--</span></div>
+        <div>COIL POS: <span id="wCoilPos" style="color:var(--green)">--</span></div>
+        <div>CORTEX RES: <span id="wCortexRes" style="color:var(--wf)">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTRE -->
+  <div class="centerwrap">
+    <div class="turnindicator">
+      <div class="turndot active" id="turnW"><div class="dot w"></div><span>WHITE</span></div>
+      <div class="turndot" id="turnB"><div class="dot b"></div><span>BLACK</span></div>
+    </div>
+    <div id="board"></div>
+    <div class="controls">
+      <button class="btn primary" id="btnStart">START</button>
+      <button class="btn" id="btnPause" disabled>PAUSE</button>
+      <button class="btn danger" id="btnReset">RESET</button>
+      <button class="btn gold" id="btnClearMem">CLEAR MEM</button>
+      <div class="speedctl">
+        <span>SPD</span>
+        <input type="range" id="speed" min="1" max="10" value="5">
+        <span id="speedVal">5</span>
+      </div>
+    </div>
+    <div class="autorun-bar">
+      <div class="ar-label">AUTO-RUN</div>
+      <button class="btn ar-btn" id="btnAutoRun">▶▶ RUN 700</button>
+      <div class="ar-input-wrap">
+        <input type="number" id="arTarget" value="700" min="1" max="99999" class="ar-input">
+        <span class="ar-suffix">GAMES</span>
+      </div>
+      <div class="ar-progress-wrap">
+        <div class="ar-progress-track"><div class="ar-progress-fill" id="arProgressFill" style="width:0%"></div></div>
+        <span class="ar-progress-label" id="arProgressLabel">—</span>
+      </div>
+    </div>
+    <div style="width:100%">
+      <div style="font-size:0.46rem;letter-spacing:0.14em;opacity:0.35;margin-bottom:3px">GAME LOG</div>
+      <div class="logbox" id="gameLog"></div>
+    </div>
+  </div>
+
+  <!-- BLACK SIDE -->
+  <div class="sidepanel">
+    <div class="panelbox bs">
+      <div class="paneltitle bk">BLACK — SPIRAL CORTEX</div>
+      <div class="cortexwrap"><canvas id="cortexB" width="180" height="180"></canvas></div>
+      <div class="fbarwrap">
+        <div class="flabel"><span>FREEDOM</span><span id="bFreedomPct">100%</span></div>
+        <div class="ftrack"><div class="ffill bfill" id="bFreedomBar" style="width:100%"></div></div>
+      </div>
+      <div style="margin-top:4px;font-size:0.42rem;opacity:0.35;letter-spacing:0.1em;">
+        COIL: <span id="bCoilActive">—</span>
+      </div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">SACK NEURONS — BLACK</div>
+      <div class="neuron-bars" id="bNeuronBars"></div>
+      <div style="margin-top:5px;font-size:0.48rem;opacity:0.4;letter-spacing:0.1em;">
+        ACT:<span id="bActive">0</span> DEAD:<span id="bDead">0</span> CONF:<span id="bConf">0.000</span>
+      </div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">CAPTURED BY BLACK</div>
+      <div class="caplist" id="bCaptured"></div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">SIGNAL</div>
+      <div class="presslog">
+        <div>MOVE: <span id="bAction" style="color:var(--textbright)">--</span></div>
+        <div>ΔFREEDOM: <span id="bDelta" style="color:var(--textbright)">--</span></div>
+        <div>THREAT: <span id="bThreat" style="color:#ffcc00">--</span></div>
+        <div>COIL POS: <span id="bCoilPos" style="color:var(--green)">--</span></div>
+        <div>CORTEX RES: <span id="bCortexRes" style="color:var(--bf)">--</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// SACK CHESS v6 — CLIENT
+// All game logic in Go backend. This is pure renderer + UI controller.
+// API: /tick /reset /clear /save /status
+// ============================================================================
+
+var SPIRAL_COILS = 8;
+var SPIRAL_BASE  = 8;
+var SPIRAL_MAP = (function(){
+  var sizes=[],starts=[],total=0;
+  for(var k=0;k<SPIRAL_COILS;k++){sizes.push(SPIRAL_BASE*Math.pow(2,k));starts.push(total);total+=SPIRAL_BASE*Math.pow(2,k);}
+  return{sizes:sizes,starts:starts,total:total};
+})();
+var FIELD_SIZE = SPIRAL_MAP.total;
+var NEURON_COUNT = 50;
+
+var CHECK_WIN = 25;
+var API = '';  // same origin
+
+var PIECES = {wK:'\u2654',wQ:'\u2655',wR:'\u2656',wB:'\u2657',wN:'\u2658',wP:'\u2659',
+              bK:'\u265A',bQ:'\u265B',bR:'\u265C',bB:'\u265D',bN:'\u265E',bP:'\u265F'};
+
+// ---- client-side state (display only) ----
+var uiState = {
+  board: null,
+  turn: 'w',
+  wChecks: 0, bChecks: 0,
+  wCaptured: [], bCaptured: [],
+  wFreedom: 1, bFreedom: 1,
+  moveCount: 0, generations: 0, wWins: 0, bWins: 0,
+  wLastMove: null, bLastMove: null,
+  sackW: null, sackB: null,
+  gameOver: false
+};
+
+var running = false;
+var intervalId = null;
+var autoRunActive = false;
+var autoRunTarget = 700;
+var autoRunStartGen = 0;
+var pendingTick = false;
+
+// ---- spiral helpers (client, for cortex render only) ----
+function spiralCoil(pos){
+  var p=((pos%FIELD_SIZE)+FIELD_SIZE)%FIELD_SIZE;
+  for(var k=SPIRAL_COILS-1;k>=0;k--)if(p>=SPIRAL_MAP.starts[k])return k;
+  return 0;
+}
+function isCoilBoundary(pos){
+  var p=((pos%FIELD_SIZE)+FIELD_SIZE)%FIELD_SIZE;
+  for(var k=0;k<SPIRAL_COILS;k++){var s=SPIRAL_MAP.starts[k],e=s+SPIRAL_MAP.sizes[k]-1;if(p===s||p===e)return true;}
+  return false;
+}
+
+// ---- API calls ----
+function apiFetch(path, cb) {
+  fetch(API + path).then(function(r){return r.json();}).then(cb).catch(function(e){
+    log('ERROR: '+e.message,'important');
+  });
+}
+
+// ---- TICK ----
+function doTick() {
+  if (pendingTick) return;
+  pendingTick = true;
+  apiFetch('/tick', function(d) {
+    pendingTick = false;
+    applyTickResult(d);
+  });
+}
+
+function applyTickResult(d) {
+  // Update UI state
+  uiState.board       = d.board;
+  uiState.turn        = d.turn;
+  uiState.wChecks     = d.wChecks;
+  uiState.bChecks     = d.bChecks;
+  uiState.wCaptured   = d.wCaptured || [];
+  uiState.bCaptured   = d.bCaptured || [];
+  uiState.wFreedom    = d.wFreedom;
+  uiState.bFreedom    = d.bFreedom;
+  uiState.moveCount   = d.moveCount;
+  uiState.generations = d.generations;
+  uiState.wWins       = d.wWins;
+  uiState.bWins       = d.bWins;
+  uiState.sackW       = d.sackW;
+  uiState.sackB       = d.sackB;
+  uiState.gameOver    = d.gameOver;
+  if (d.move) {
+    if (d.color === 'w') uiState.wLastMove = d.move;
+    else uiState.bLastMove = d.move;
+  }
+
+  // Logs
+  if (d.log) d.log.forEach(function(e){log(e.msg, e.cls);});
+
+  // Signal display
+  if (d.color === 'w') {
+    if(d.moveStr){var el=document.getElementById('wAction');if(el)el.textContent=d.moveStr;}
+    if(d.wDelta!==undefined){var el=document.getElementById('wDelta');if(el)el.textContent=(d.wDelta>=0?'+':'')+d.wDelta.toFixed(3);}
+    if(d.wThreat!==undefined){var el=document.getElementById('wThreat');if(el)el.textContent=d.wThreat.toFixed(3);}
+    if(d.wCoilPos){var el=document.getElementById('wCoilPos');if(el)el.textContent=d.wCoilPos;}
+    if(d.wConf!==undefined){var el=document.getElementById('wCortexRes');if(el)el.textContent=d.wConf.toFixed(3);}
+    if(d.wCoilPos){var el=document.getElementById('wCoilActive');if(el)el.textContent=d.wCoilPos;}
+  } else {
+    if(d.moveStr){var el=document.getElementById('bAction');if(el)el.textContent=d.moveStr;}
+    if(d.bDelta!==undefined){var el=document.getElementById('bDelta');if(el)el.textContent=(d.bDelta>=0?'+':'')+d.bDelta.toFixed(3);}
+    if(d.bThreat!==undefined){var el=document.getElementById('bThreat');if(el)el.textContent=d.bThreat.toFixed(3);}
+    if(d.bCoilPos){var el=document.getElementById('bCoilPos');if(el)el.textContent=d.bCoilPos;}
+    if(d.bConf!==undefined){var el=document.getElementById('bCortexRes');if(el)el.textContent=d.bConf.toFixed(3);}
+    if(d.bCoilPos){var el=document.getElementById('bCoilActive');if(el)el.textContent=d.bCoilPos;}
+  }
+
+  renderBoard();
+  renderSpiralCortex('cortexW', d.sackW, true);
+  renderSpiralCortex('cortexB', d.sackB, false);
+  renderNeuronBars('wNeuronBars', d.sackW, true);
+  renderNeuronBars('bNeuronBars', d.sackB, false);
+  updateUI();
+
+  if (d.gameOver && d.winner) {
+    handleWin(d.winner, d.winReason, d);
+  } else if (d.gameOver) {
+    // draw/stalemate
+    if (autoRunActive) {
+      var gr = uiState.generations - autoRunStartGen;
+      updateAutoRunProgress();
+      if (gr >= autoRunTarget) { stopAutoRun(); }
+    }
+  }
+}
+
+// ---- WIN ----
+function handleWin(winner, reason, d) {
+  var winName = winner === 'w' ? 'WHITE' : 'BLACK';
+  log('✦ ' + winName + ' WINS (' + (reason||'') + ') — W:' + (d.sackW?d.sackW.totalChains:0) + ' B:' + (d.sackB?d.sackB.totalChains:0) + ' chains', 'win');
+
+  if (autoRunActive) {
+    var gr = uiState.generations - autoRunStartGen;
+    updateAutoRunProgress();
+    if (gr >= autoRunTarget) { stopAutoRun(); return; }
+    // next game auto-starts from next tick
+    return;
+  }
+
+  // Show win overlay
+  clearInterval(intervalId); running = false;
+  var el = document.getElementById;
+  var overlay = document.getElementById('overlay');
+  var winBox  = document.getElementById('winBox');
+  if (overlay && winBox) {
+    winBox.className = 'win-box ' + (winner==='w'?'ww':'bw');
+    document.getElementById('winName').textContent = winName;
+    document.getElementById('winDetail').textContent =
+      (winner==='w'?uiState.wChecks:uiState.bChecks) + ' CHECKS  ·  GEN ' + uiState.generations + '  ·  MOVES ' + uiState.moveCount;
+    document.getElementById('winChain').textContent =
+      '✦ W CHAINS:' + (d.sackW?d.sackW.totalChains:0) + ' B CHAINS:' + (d.sackB?d.sackB.totalChains:0);
+    overlay.classList.add('show');
+  }
+  var btnStart = document.getElementById('btnStart');
+  var btnPause = document.getElementById('btnPause');
+  if(btnStart) btnStart.disabled = false;
+  if(btnPause) btnPause.disabled = true;
+}
+
+function stopAutoRun() {
+  autoRunActive = false;
+  clearInterval(intervalId); running = false;
+  apiFetch('/save', function(){});
+  var btn = document.getElementById('btnAutoRun');
+  if(btn) { btn.classList.remove('active'); btn.textContent='▶▶ RUN '+(parseInt(document.getElementById('arTarget').value)||700); }
+  log('★★★ AUTO-RUN COMPLETE ★★★','win');
+}
+
+// ============================================================================
+// CORTEX RENDERER (client-side visual from backend stats)
+// Uses neuron data returned in sackW/sackB stats objects
+// ============================================================================
+function renderSpiralCortex(canvasId, sackStats, isWhite) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas || !sackStats) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height, cx = W/2, cy = H/2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.beginPath(); ctx.arc(cx,cy,cx-2,0,Math.PI*2);
+  ctx.fillStyle='#050e15'; ctx.fill();
+  var mainColor = isWhite ? [0,229,255] : [255,61,110];
+  var neurons = sackStats.neurons || [];
+  for (var k = SPIRAL_COILS-1; k>=0; k--) {
+    var r = (cx-4)*(k+1)/SPIRAL_COILS;
+    var coilAct=0, coilCount=0;
+    for(var ni=0;ni<neurons.length;ni++){
+      var n=neurons[ni];
+      if(spiralCoil(n.peakPos)===k){coilAct+=n.activations;coilCount++;}
+    }
+    var avgAct=coilCount>0?coilAct/coilCount:0;
+    var intensity=Math.min(1,avgAct/20);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba('+mainColor[0]+','+mainColor[1]+','+mainColor[2]+','+(0.08+intensity*0.3)+')';
+    ctx.lineWidth=k===0?1.5:0.8; ctx.stroke();
+    for(var ni=0;ni<neurons.length;ni++){
+      var n=neurons[ni];
+      if(n.activations===0||spiralCoil(n.peakPos)!==k) continue;
+      var localPos=n.peakPos-SPIRAL_MAP.starts[k];
+      var size=SPIRAL_MAP.sizes[k];
+      var angle=(localPos/size)*Math.PI*2-Math.PI/2;
+      var nx=cx+Math.cos(angle)*r, ny=cy+Math.sin(angle)*r;
+      var actI=Math.min(1,n.activations/20);
+      var dotR=n.isBoundary?3.5:2;
+      var coilPct=k/(SPIRAL_COILS-1);
+      var h=isWhite?(180-coilPct*150):(340+coilPct*30);
+      ctx.beginPath(); ctx.arc(nx,ny,dotR,0,Math.PI*2);
+      ctx.fillStyle='hsla('+h+',80%,'+(40+actI*30)+'%,'+(0.4+actI*0.6)+')';
+      ctx.fill();
+      if(n.isBoundary){ctx.beginPath();ctx.arc(nx,ny,dotR+1.5,0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=0.5;ctx.stroke();}
+    }
+  }
+  // Chain position dot
+  if(sackStats.spiralPos>0){
+    var c=spiralCoil(sackStats.spiralPos);
+    var pr=(cx-4)*(c+1)/SPIRAL_COILS;
+    var lp=sackStats.spiralPos-SPIRAL_MAP.starts[c];
+    var sz=SPIRAL_MAP.sizes[c];
+    var ang=(lp/sz)*Math.PI*2-Math.PI/2;
+    var px=cx+Math.cos(ang)*pr, py=cy+Math.sin(ang)*pr;
+    ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);
+    ctx.fillStyle='rgba('+mainColor[0]+','+mainColor[1]+','+mainColor[2]+',0.9)';
+    ctx.shadowBlur=10; ctx.shadowColor='rgba('+mainColor[0]+','+mainColor[1]+','+mainColor[2]+',0.8)';
+    ctx.fill(); ctx.shadowBlur=0;
+  }
+  ctx.beginPath();ctx.arc(cx,cy,cx-2,0,Math.PI*2);
+  ctx.strokeStyle='rgba('+mainColor[0]+','+mainColor[1]+','+mainColor[2]+',0.15)';
+  ctx.lineWidth=1;ctx.stroke();
+}
+
+function renderNeuronBars(gridId, sackStats, isWhite) {
+  var grid = document.getElementById(gridId);
+  if (!grid || !sackStats || !sackStats.neurons) return; // Added null check
+  grid.innerHTML = '';
+  var neurons = sackStats.neurons;
+  for (var i = 0; i < NEURON_COUNT; i++) {
+    var n = neurons[i];
+    if(!n) continue;
+
+    var bar = document.createElement('div');
+    bar.className = 'n-bar';
+    
+    // Ensure we check both cases just in case
+    var acts = n.activations || n.Activations || 0; 
+    var isBound = n.isBoundary || n.IsBoundary || false;
+
+    if (acts === 0) {
+      bar.style.background = '#1a0a0a';
+      bar.style.height = '3px';
+    } else {
+      var dc = dominantCoil(n);
+      var coilPct = dc / (SPIRAL_COILS-1);
+      var h = isWhite ? (180-coilPct*150) : (340+coilPct*30);
+      var lit = 35 + Math.min(30, acts * 0.8);
+      bar.style.background = 'hsl('+h+',75%,'+lit+'%)';
+      bar.style.height = Math.min(32, 3 + acts * 0.5) + 'px';
+      if(acts > 20) bar.style.boxShadow = '0 0 4px hsl('+h+',80%,65%)';
+      if(isBound) bar.style.outline = '1px solid rgba(255,255,255,0.3)';
+    }
+    grid.appendChild(bar);
+  }
+}
+
+function dominantCoil(n) {
+  if(!n.coilHits) return 0;
+  var best=0,bestK=0;
+  for(var k=0;k<SPIRAL_COILS;k++){var h=n.coilHits[k]||n.coilHits[''+k]||0;if(h>best){best=h;bestK=k;}}
+  return bestK;
+}
+
+// ---- BOARD RENDER ----
+function renderBoard() {
+  var boardEl = document.getElementById('board'); if(!boardEl) return;
+  boardEl.innerHTML = '';
+  var ranks=['8','7','6','5','4','3','2','1'], files=['a','b','c','d','e','f','g','h'];
+  var board = uiState.board;
+  if (!board) return;
+  // Check detection from server is embedded in sack stats — we just mark check via king-check class
+  var wLM = uiState.wLastMove, bLM = uiState.bLastMove;
+  for(var r=0;r<8;r++) for(var f=0;f<8;f++){
+    var cell=document.createElement('div');
+    var rfs=r+'_'+f;
+    cell.className='cell '+((r+f)%2===0?'light':'dark');
+    if(wLM&&(r===wLM.From[0]&&f===wLM.From[1]||r===wLM.To[0]&&f===wLM.To[1])) cell.className+=' hlw';
+    if(bLM&&(r===bLM.From[0]&&f===bLM.From[1]||r===bLM.To[0]&&f===bLM.To[1])) cell.className+=' hlb';
+    var p=board[r][f];
+    if(p){
+      var span=document.createElement('span');
+      span.textContent=PIECES[p.color+p.type]||'?';
+      span.className='piece-'+p.color;
+      cell.appendChild(span);
+    }
+    if(f===7){var c=document.createElement('span');c.className='coord coord-rank';c.textContent=ranks[r];cell.appendChild(c);}
+    if(r===7){var c=document.createElement('span');c.className='coord coord-file';c.textContent=files[f];cell.appendChild(c);}
+    boardEl.appendChild(cell);
+  }
+}
+
+// ---- UI UPDATE ----
+function el(id){return document.getElementById(id);}
+function updateUI() {
+  var wPct=Math.round(uiState.wFreedom*100), bPct=Math.round(uiState.bFreedom*100);
+  if(el('wFreedomPct'))el('wFreedomPct').textContent=wPct+'%';
+  if(el('wFreedomBar'))el('wFreedomBar').style.width=wPct+'%';
+  if(el('bFreedomPct'))el('bFreedomPct').textContent=bPct+'%';
+  if(el('bFreedomBar'))el('bFreedomBar').style.width=bPct+'%';
+  if(el('genNum'))el('genNum').textContent=uiState.generations;
+  if(el('wWins'))el('wWins').textContent=uiState.wWins;
+  if(el('bWins'))el('bWins').textContent=uiState.bWins;
+  if(el('moveCount'))el('moveCount').textContent=uiState.moveCount;
+  var ws=uiState.sackW||{}, bs=uiState.sackB||{};
+  if(el('totalChains'))el('totalChains').textContent=((ws.totalChains||0)+(bs.totalChains||0));
+  if(el('wChains'))el('wChains').textContent=ws.totalChains||0;
+  if(el('bChains'))el('bChains').textContent=bs.totalChains||0;
+  var wc=uiState.wChecks, bc=uiState.bChecks;
+  if(el('wCheckNum'))el('wCheckNum').textContent=wc;
+  if(el('bCheckNum'))el('bCheckNum').textContent=bc;
+  if(el('wCheckBar'))el('wCheckBar').style.width=Math.min(100,(wc/CHECK_WIN)*100)+'%';
+  if(el('bCheckBar'))el('bCheckBar').style.width=Math.min(100,(bc/CHECK_WIN)*100)+'%';
+  if(el('wCaptured'))el('wCaptured').textContent=(uiState.wCaptured||[]).map(function(t){return PIECES['b'+t]||'';}).join('');
+  if(el('bCaptured'))el('bCaptured').textContent=(uiState.bCaptured||[]).map(function(t){return PIECES['w'+t]||'';}).join('');
+  if(el('wActive'))el('wActive').textContent=ws.active||0;
+  if(el('wDead'))el('wDead').textContent=ws.dead||0;
+  if(el('wConf'))el('wConf').textContent=(ws.conf||0).toFixed(3);
+  if(el('bActive'))el('bActive').textContent=bs.active||0;
+  if(el('bDead'))el('bDead').textContent=bs.dead||0;
+  if(el('bConf'))el('bConf').textContent=(bs.conf||0).toFixed(3);
+  if(el('chainLen'))el('chainLen').textContent=ws.chainLen||0;
+  if(el('turnW'))el('turnW').classList.toggle('active',uiState.turn==='w');
+  if(el('turnB'))el('turnB').classList.toggle('active',uiState.turn==='b');
+}
+
+function log(msg,cls){
+  var box=document.getElementById('gameLog');if(!box)return;
+  var div=document.createElement('div');div.className='log-entry '+(cls||'');div.textContent=msg;
+  box.appendChild(div);box.scrollTop=box.scrollHeight;
+  while(box.children.length>150)box.removeChild(box.firstChild);
+}
+
+function getMs(){return Math.max(20,Math.round(800/(parseInt(el('speed').value)||5)));}
+
+function updateAutoRunProgress(){
+  var gr=Math.max(0,uiState.generations-autoRunStartGen);
+  var pct=autoRunActive?Math.min(100,(gr/autoRunTarget)*100):(gr>=autoRunTarget?100:0);
+  if(el('arProgressFill'))el('arProgressFill').style.width=pct+'%';
+  if(el('arProgressLabel'))el('arProgressLabel').textContent=autoRunActive||gr>0?gr+'/'+autoRunTarget:'—';
+  if(el('btnAutoRun')){var tgt=parseInt(el('arTarget').value)||700;el('btnAutoRun').textContent=autoRunActive?('■ STOP ('+gr+')'):'▶▶ RUN '+tgt;}
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+  // Load initial status
+  apiFetch('/status', function(d) {
+    uiState.board = d.board;
+    uiState.turn = d.turn;
+    uiState.wChecks = d.wChecks;
+    uiState.bChecks = d.bChecks;
+    uiState.wCaptured = d.wCaptured || [];
+    uiState.bCaptured = d.bCaptured || [];
+    uiState.wFreedom = d.wFreedom;
+    uiState.bFreedom = d.bFreedom;
+    uiState.moveCount = d.moveCount;
+    uiState.generations = d.generations;
+    uiState.wWins = d.wWins;
+    uiState.bWins = d.bWins;
+    uiState.sackW = d.sackW;
+    uiState.sackB = d.sackB;
+    renderBoard();
+    renderSpiralCortex('cortexW', d.sackW, true);
+    renderSpiralCortex('cortexB', d.sackB, false);
+    renderNeuronBars('wNeuronBars', d.sackW, true);
+    renderNeuronBars('bNeuronBars', d.sackB, false);
+    updateUI();
+    if (d.sackW && d.sackW.totalChains > 0) {
+      log('✦ PERSISTENT CORTEX LOADED — W:'+d.sackW.totalChains+' B:'+d.sackB.totalChains+' chains','chain');
+    }
+    log('✦ SACK CHESS v6 — GO BACKEND CONNECTED','important');
+    log('  FIELD SIZE: '+FIELD_SIZE+' | COILS: '+SPIRAL_COILS+' | NEURONS: '+NEURON_COUNT,'');
+    log('  PRESS START TO BEGIN','');
+  });
+
+  el('btnStart').addEventListener('click',function(){
+    if(running)return;running=true;this.disabled=true;el('btnPause').disabled=false;
+    if(intervalId)clearInterval(intervalId);
+    intervalId=setInterval(doTick,getMs());
+    log('▶ STARTED','important');
+  });
+  el('btnPause').addEventListener('click',function(){
+    if(!running)return;running=false;clearInterval(intervalId);
+    el('btnStart').disabled=false;this.disabled=true;log('‖ PAUSED','');
+  });
+  el('btnReset').addEventListener('click',function(){
+    clearInterval(intervalId);running=false;
+    apiFetch('/reset',function(d){
+      uiState = {board:d.board||null,turn:'w',wChecks:0,bChecks:0,wCaptured:[],bCaptured:[],
+        wFreedom:1,bFreedom:1,moveCount:0,generations:uiState.generations,
+        wWins:uiState.wWins,bWins:uiState.bWins,sackW:uiState.sackW,sackB:uiState.sackB,gameOver:false,
+        wLastMove:null,bLastMove:null};
+      el('btnStart').disabled=false;el('btnPause').disabled=true;
+      el('gameLog').innerHTML='';
+      apiFetch('/status',function(s){
+        uiState.board=s.board;uiState.sackW=s.sackW;uiState.sackB=s.sackB;
+        renderBoard();renderSpiralCortex('cortexW',s.sackW,true);renderSpiralCortex('cortexB',s.sackB,false);
+        renderNeuronBars('wNeuronBars',s.sackW,true);renderNeuronBars('bNeuronBars',s.sackB,false);
+        updateUI();log('↺ RESET — CORTEX MEMORY RETAINED','important');
+      });
+    });
+  });
+  el('btnClearMem').addEventListener('click',function(){
+    clearInterval(intervalId);running=false;
+    apiFetch('/clear',function(){
+      uiState={board:null,turn:'w',wChecks:0,bChecks:0,wCaptured:[],bCaptured:[],
+        wFreedom:1,bFreedom:1,moveCount:0,generations:0,wWins:0,bWins:0,
+        sackW:null,sackB:null,gameOver:false,wLastMove:null,bLastMove:null};
+      el('btnStart').disabled=false;el('btnPause').disabled=true;
+      el('gameLog').innerHTML='';
+      apiFetch('/status',function(s){
+        uiState.board=s.board;uiState.sackW=s.sackW;uiState.sackB=s.sackB;
+        renderBoard();renderSpiralCortex('cortexW',s.sackW,true);renderSpiralCortex('cortexB',s.sackB,false);
+        renderNeuronBars('wNeuronBars',s.sackW,true);renderNeuronBars('bNeuronBars',s.sackB,false);
+        updateUI();log('✕ CORTEX WIPED — FRESH START','important');
+      });
+    });
+  });
+  el('speed').addEventListener('input',function(){
+    if(el('speedVal'))el('speedVal').textContent=this.value;
+    if(running){clearInterval(intervalId);intervalId=setInterval(doTick,getMs());}
+  });
+  el('winBtn').addEventListener('click',function(){
+    el('overlay').classList.remove('show');
+    if(running||autoRunActive){if(intervalId)clearInterval(intervalId);intervalId=setInterval(doTick,getMs());}
+  });
+  el('arTarget').addEventListener('input',function(){
+    var tgt=parseInt(this.value)||700;
+    if(!autoRunActive&&el('btnAutoRun'))el('btnAutoRun').textContent='▶▶ RUN '+tgt;
+  });
+  el('btnAutoRun').addEventListener('click',function(){
+    if(autoRunActive){
+      autoRunActive=false;this.classList.remove('active');
+      this.textContent='▶▶ RUN '+(parseInt(el('arTarget').value)||700);
+      log('■ AUTO-RUN STOPPED AT GEN '+uiState.generations,'important');return;
+    }
+    autoRunTarget=parseInt(el('arTarget').value)||700;
+    autoRunStartGen=uiState.generations;autoRunActive=true;
+    this.classList.add('active');this.textContent='■ STOP (0)';
+    log('▶▶ AUTO-RUN — TARGET: '+autoRunTarget+' GAMES','win');
+    if(!running){
+      running=true;el('btnStart').disabled=true;el('btnPause').disabled=false;
+      if(intervalId)clearInterval(intervalId);intervalId=setInterval(doTick,getMs());
+    }
+    updateAutoRunProgress();
+  });
+});
+</script>
+</body>
+</html>

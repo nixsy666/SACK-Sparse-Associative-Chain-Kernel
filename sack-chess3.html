@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SACK CHESS v4</title>
+<style>
+:root {
+  --bg:#020508;--panel:#060d12;--border:#0a1e2e;
+  --wf:#00e5ff;--bf:#ff3d6e;--gold:#ffd700;--green:#00ff88;
+  --text:#6aa8c4;--textbright:#c0e8f5;--neutral:#0f1e2a;
+  --boardlight:#0b1a24;--boarddark:#050e15;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Courier New','Lucida Console',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);pointer-events:none;z-index:1000;}
+
+header{width:100%;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#04101a 0%,transparent 100%);flex-wrap:wrap;gap:8px;}
+.title{font-size:0.95rem;font-weight:900;letter-spacing:0.35em;color:var(--textbright);text-shadow:0 0 18px rgba(0,229,255,0.4);}
+.subtitle{font-size:0.52rem;letter-spacing:0.2em;opacity:0.5;margin-top:2px;}
+.hdr-stats{display:flex;gap:12px;font-size:0.6rem;flex-wrap:wrap;align-items:flex-end;}
+.hstat{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.hstat-label{opacity:0.35;font-size:0.45rem;letter-spacing:0.15em;}
+.hstat-val{color:var(--textbright);}
+
+.checkbar{width:100%;max-width:1160px;padding:6px 14px;display:flex;gap:8px;}
+.chkbox{flex:1;padding:8px 14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden;background:var(--panel);}
+.chkbox.wc{border-color:rgba(0,229,255,0.4);}
+.chkbox.bc{border-color:rgba(255,61,110,0.4);}
+.chk-lbl{font-size:0.48rem;letter-spacing:0.18em;opacity:0.5;}
+.chk-sub{font-size:0.4rem;opacity:0.28;letter-spacing:0.1em;margin-top:1px;}
+.chk-num{font-size:1.4rem;font-weight:900;}
+.chkbox.wc .chk-num{color:var(--wf);text-shadow:0 0 12px var(--wf);}
+.chkbox.bc .chk-num{color:var(--bf);text-shadow:0 0 12px var(--bf);}
+.chk-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--neutral);}
+.chk-fill{height:100%;transition:width 0.3s ease;}
+.chk-fill.w{background:var(--wf);box-shadow:0 0 6px var(--wf);}
+.chk-fill.b{background:var(--bf);box-shadow:0 0 6px var(--bf);}
+
+.statbar{width:100%;max-width:1160px;padding:0 14px;display:flex;gap:8px;font-size:0.55rem;letter-spacing:0.08em;flex-wrap:wrap;}
+.genstat{flex:1;min-width:80px;background:var(--panel);border:1px solid var(--border);padding:5px 10px;display:flex;justify-content:space-between;align-items:center;}
+.genstat span:last-child{color:var(--textbright);font-size:0.6rem;}
+
+.overlay{display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.win-box{border:1px solid var(--border);padding:40px 60px;text-align:center;background:var(--panel);position:relative;overflow:hidden;max-width:460px;}
+.win-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.win-box.ww::before{background:var(--wf);box-shadow:0 0 20px var(--wf);}
+.win-box.bw::before{background:var(--bf);box-shadow:0 0 20px var(--bf);}
+.win-tag{font-size:0.48rem;letter-spacing:0.38em;opacity:0.4;margin-bottom:8px;}
+.win-name{font-size:2.2rem;font-weight:900;letter-spacing:0.22em;margin-bottom:5px;}
+.win-box.ww .win-name{color:var(--wf);text-shadow:0 0 28px var(--wf);}
+.win-box.bw .win-name{color:var(--bf);text-shadow:0 0 28px var(--bf);}
+.win-detail{font-size:0.55rem;opacity:0.5;letter-spacing:0.15em;line-height:1.8;}
+.win-chain{font-size:0.52rem;color:var(--green);margin-top:8px;letter-spacing:0.1em;opacity:0.85;line-height:1.6;}
+.win-btn{margin-top:22px;font-family:'Courier New',monospace;font-size:0.58rem;letter-spacing:0.18em;padding:12px 30px;background:transparent;border:1px solid var(--wf);color:var(--wf);cursor:pointer;}
+
+.main{display:grid;grid-template-columns:200px 1fr 200px;gap:12px;padding:12px 14px;width:100%;max-width:1160px;align-items:start;}
+@media(max-width:780px){.main{grid-template-columns:1fr;}}
+.sidepanel{display:flex;flex-direction:column;gap:10px;}
+.panelbox{background:var(--panel);border:1px solid var(--border);padding:10px;position:relative;overflow:hidden;}
+.panelbox::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+.panelbox.ws::before{background:var(--wf);box-shadow:0 0 8px var(--wf);}
+.panelbox.bs::before{background:var(--bf);box-shadow:0 0 8px var(--bf);}
+.paneltitle{font-size:0.52rem;letter-spacing:0.2em;margin-bottom:7px;opacity:0.55;}
+.paneltitle.wt{color:var(--wf);}
+.paneltitle.bk{color:var(--bf);}
+
+/* Spiral cortex canvas */
+.cortexwrap{display:flex;align-items:center;justify-content:center;}
+.cortexwrap canvas{width:100%;max-width:180px;height:auto;}
+.fbarwrap{margin-top:6px;}
+.flabel{font-size:0.52rem;letter-spacing:0.1em;opacity:0.45;margin-bottom:3px;display:flex;justify-content:space-between;}
+.ftrack{height:3px;background:var(--neutral);position:relative;overflow:hidden;}
+.ffill{height:100%;transition:width 0.4s ease;}
+.wfill{background:var(--wf);box-shadow:0 0 6px var(--wf);}
+.bfill{background:var(--bf);box-shadow:0 0 6px var(--bf);}
+
+.caplist{font-size:0.9rem;min-height:20px;display:flex;flex-wrap:wrap;gap:2px;}
+.presslog{font-size:0.54rem;line-height:1.75;opacity:0.65;}
+
+/* Neuron bar chart */
+.neuron-bars{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;margin-top:4px;align-items:end;height:32px;}
+.n-bar{width:100%;border-radius:1px 1px 0 0;background:var(--neutral);transition:all 0.35s;}
+
+.logbox{background:var(--panel);border:1px solid var(--border);padding:8px;height:140px;overflow-y:auto;font-size:0.56rem;line-height:1.65;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.log-entry{opacity:0.65;}
+.log-entry.important{opacity:1;color:var(--textbright);}
+.log-entry.w-event{color:var(--wf);}
+.log-entry.b-event{color:var(--bf);}
+.log-entry.check{color:#ffcc00;}
+.log-entry.win{color:var(--gold);}
+.log-entry.chain{color:var(--green);}
+
+.centerwrap{display:flex;flex-direction:column;align-items:center;gap:8px;}
+#board{display:grid;grid-template-columns:repeat(8,1fr);border:1px solid var(--border);}
+.cell{width:calc(min(50vw,460px)/8);height:calc(min(50vw,460px)/8);display:flex;align-items:center;justify-content:center;position:relative;font-size:clamp(0.9rem,3.2vw,1.7rem);cursor:default;}
+.cell.light{background:var(--boardlight);}
+.cell.dark{background:var(--boarddark);}
+.cell.hlw{box-shadow:inset 0 0 0 2px var(--wf);background:rgba(0,229,255,0.07)!important;}
+.cell.hlb{box-shadow:inset 0 0 0 2px var(--bf);background:rgba(255,61,110,0.07)!important;}
+.cell.threat{box-shadow:inset 0 0 0 1px rgba(255,215,0,0.4);background:rgba(255,215,0,0.03)!important;}
+.piece-w,.piece-b{font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Arial Unicode MS',serif;line-height:1;display:block;}
+.piece-w{text-shadow:0 0 10px var(--wf),0 0 18px rgba(0,229,255,0.4);filter:drop-shadow(0 0 3px rgba(0,229,255,0.5));}
+.piece-b{text-shadow:0 0 10px var(--bf),0 0 18px rgba(255,61,110,0.4);filter:drop-shadow(0 0 3px rgba(255,61,110,0.5));}
+.king-check{animation:checkpulse 0.5s infinite alternate;}
+@keyframes checkpulse{from{filter:drop-shadow(0 0 5px #ffcc00);}to{filter:drop-shadow(0 0 18px #ffcc00);}}
+.coord{position:absolute;font-size:0.38rem;opacity:0.18;}
+.coord-rank{bottom:1px;right:2px;}
+.coord-file{top:1px;left:2px;}
+
+.controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:center;}
+.btn{font-family:'Courier New','Lucida Console',monospace;font-size:0.56rem;letter-spacing:0.14em;padding:9px 14px;min-height:40px;background:transparent;border:1px solid var(--border);color:var(--text);cursor:pointer;transition:border-color 0.2s,color 0.2s;}
+.btn:hover{border-color:var(--textbright);color:var(--textbright);}
+.btn.primary{border-color:var(--wf);color:var(--wf);}
+.btn.danger{border-color:var(--bf);color:var(--bf);}
+.btn.gold{border-color:var(--gold);color:var(--gold);font-size:0.5rem;}
+.btn:disabled{opacity:0.25;cursor:not-allowed;}
+.speedctl{display:flex;align-items:center;gap:5px;font-size:0.56rem;}
+.speedctl input{width:65px;accent-color:var(--wf);}
+.turnindicator{display:flex;gap:16px;font-size:0.58rem;letter-spacing:0.14em;}
+.turndot{display:flex;align-items:center;gap:5px;opacity:0.35;transition:opacity 0.3s;}
+.turndot.active{opacity:1;}
+.dot{width:5px;height:5px;border-radius:50%;}
+.dot.w{background:var(--wf);box-shadow:0 0 7px var(--wf);}
+.dot.b{background:var(--bf);box-shadow:0 0 7px var(--bf);}
+
+.autorun-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;padding:7px 10px;border:1px solid var(--border);background:var(--panel);width:100%;margin-top:2px;}
+.ar-label{font-size:0.46rem;letter-spacing:0.2em;opacity:0.35;}
+.ar-btn{border-color:var(--gold)!important;color:var(--gold)!important;font-size:0.54rem;min-height:34px;padding:5px 12px;}
+.ar-btn.active{background:rgba(255,215,0,0.08);box-shadow:0 0 10px rgba(255,215,0,0.25);}
+.ar-input-wrap{display:flex;align-items:center;gap:3px;}
+.ar-input{width:65px;background:var(--bg);border:1px solid var(--border);color:var(--textbright);font-family:'Courier New',monospace;font-size:0.6rem;padding:3px 7px;text-align:right;}
+.ar-suffix{font-size:0.46rem;opacity:0.35;letter-spacing:0.08em;}
+.ar-progress-wrap{display:flex;align-items:center;gap:7px;flex:1;min-width:110px;}
+.ar-progress-track{flex:1;height:3px;background:var(--neutral);position:relative;overflow:hidden;}
+.ar-progress-fill{height:100%;background:var(--gold);box-shadow:0 0 6px var(--gold);transition:width 0.3s ease;}
+.ar-progress-label{font-size:0.5rem;color:var(--gold);min-width:55px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="win-box" id="winBox">
+    <div class="win-tag">SACK CHAIN VICTORY</div>
+    <div class="win-name" id="winName">WHITE</div>
+    <div class="win-detail" id="winDetail"></div>
+    <div class="win-chain" id="winChain"></div>
+    <button class="win-btn" id="winBtn">NEXT GENERATION ▶</button>
+  </div>
+</div>
+
+<header>
+  <div>
+    <div class="title">SACK CHESS v4</div>
+    <div class="subtitle">SPIRAL CORTEX · DIRECT ENCODING · THREAT FUNNEL · INDEPENDENT FIELDS</div>
+  </div>
+  <div class="hdr-stats">
+    <div class="hstat"><span class="hstat-label">GEN</span><span class="hstat-val" id="genNum">0</span></div>
+    <div class="hstat"><span class="hstat-label">W WINS</span><span class="hstat-val" id="wWins">0</span></div>
+    <div class="hstat"><span class="hstat-label">B WINS</span><span class="hstat-val" id="bWins">0</span></div>
+    <div class="hstat"><span class="hstat-label">CHAINS</span><span class="hstat-val" id="totalChains">0</span></div>
+  </div>
+</header>
+
+<div class="checkbar">
+  <div class="chkbox wc">
+    <div><div class="chk-lbl">WHITE CHECKS</div><div class="chk-sub">WIN AT 25</div></div>
+    <div class="chk-num" id="wCheckNum">0</div>
+    <div class="chk-track"><div class="chk-fill w" id="wCheckBar" style="width:0%"></div></div>
+  </div>
+  <div class="chkbox bc">
+    <div><div class="chk-lbl">BLACK CHECKS</div><div class="chk-sub">WIN AT 25</div></div>
+    <div class="chk-num" id="bCheckNum">0</div>
+    <div class="chk-track"><div class="chk-fill b" id="bCheckBar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="statbar" style="margin-top:6px;">
+  <div class="genstat"><span>W NEURONS</span><span id="wNeurons">0</span></div>
+  <div class="genstat"><span>B NEURONS</span><span id="bNeurons">0</span></div>
+  <div class="genstat"><span>CHAIN LEN</span><span id="chainLen">0</span></div>
+  <div class="genstat"><span>W CHAINS</span><span id="wChains">0</span></div>
+  <div class="genstat"><span>B CHAINS</span><span id="bChains">0</span></div>
+  <div class="genstat"><span>MOVES</span><span id="moveCount">0</span></div>
+</div>
+
+<div class="main">
+  <!-- WHITE SIDE -->
+  <div class="sidepanel">
+    <div class="panelbox ws">
+      <div class="paneltitle wt">WHITE — SPIRAL CORTEX</div>
+      <div class="cortexwrap"><canvas id="cortexW" width="180" height="180"></canvas></div>
+      <div class="fbarwrap">
+        <div class="flabel"><span>FREEDOM</span><span id="wFreedomPct">100%</span></div>
+        <div class="ftrack"><div class="ffill wfill" id="wFreedomBar" style="width:100%"></div></div>
+      </div>
+      <div style="margin-top:4px;font-size:0.42rem;opacity:0.35;letter-spacing:0.1em;">
+        COIL: <span id="wCoilActive">—</span>
+      </div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">SACK NEURONS — WHITE</div>
+      <div class="neuron-bars" id="wNeuronBars"></div>
+      <div style="margin-top:5px;font-size:0.48rem;opacity:0.4;letter-spacing:0.1em;">
+        ACT:<span id="wActive">0</span> DEAD:<span id="wDead">0</span> CONF:<span id="wConf">0.000</span>
+      </div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">CAPTURED BY WHITE</div>
+      <div class="caplist" id="wCaptured"></div>
+    </div>
+    <div class="panelbox ws">
+      <div class="paneltitle wt">SIGNAL</div>
+      <div class="presslog">
+        <div>MOVE: <span id="wAction" style="color:var(--textbright)">--</span></div>
+        <div>ΔFREEDOM: <span id="wDelta" style="color:var(--textbright)">--</span></div>
+        <div>THREAT: <span id="wThreat" style="color:#ffcc00">--</span></div>
+        <div>COIL POS: <span id="wCoilPos" style="color:var(--green)">--</span></div>
+        <div>CORTEX RES: <span id="wCortexRes" style="color:var(--wf)">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTRE -->
+  <div class="centerwrap">
+    <div class="turnindicator">
+      <div class="turndot active" id="turnW"><div class="dot w"></div><span>WHITE</span></div>
+      <div class="turndot" id="turnB"><div class="dot b"></div><span>BLACK</span></div>
+    </div>
+    <div id="board"></div>
+    <div class="controls">
+      <button class="btn primary" id="btnStart">START</button>
+      <button class="btn" id="btnPause" disabled>PAUSE</button>
+      <button class="btn danger" id="btnReset">RESET</button>
+      <button class="btn gold" id="btnClearMem">CLEAR MEM</button>
+      <div class="speedctl">
+        <span>SPD</span>
+        <input type="range" id="speed" min="1" max="10" value="5">
+        <span id="speedVal">5</span>
+      </div>
+    </div>
+    <div class="autorun-bar">
+      <div class="ar-label">AUTO-RUN</div>
+      <button class="btn ar-btn" id="btnAutoRun">▶▶ RUN 700</button>
+      <div class="ar-input-wrap">
+        <input type="number" id="arTarget" value="700" min="1" max="99999" class="ar-input">
+        <span class="ar-suffix">GAMES</span>
+      </div>
+      <div class="ar-progress-wrap">
+        <div class="ar-progress-track"><div class="ar-progress-fill" id="arProgressFill" style="width:0%"></div></div>
+        <span class="ar-progress-label" id="arProgressLabel">—</span>
+      </div>
+    </div>
+    <div style="width:100%">
+      <div style="font-size:0.46rem;letter-spacing:0.14em;opacity:0.35;margin-bottom:3px">GAME LOG</div>
+      <div class="logbox" id="gameLog"></div>
+    </div>
+  </div>
+
+  <!-- BLACK SIDE -->
+  <div class="sidepanel">
+    <div class="panelbox bs">
+      <div class="paneltitle bk">BLACK — SPIRAL CORTEX</div>
+      <div class="cortexwrap"><canvas id="cortexB" width="180" height="180"></canvas></div>
+      <div class="fbarwrap">
+        <div class="flabel"><span>FREEDOM</span><span id="bFreedomPct">100%</span></div>
+        <div class="ftrack"><div class="ffill bfill" id="bFreedomBar" style="width:100%"></div></div>
+      </div>
+      <div style="margin-top:4px;font-size:0.42rem;opacity:0.35;letter-spacing:0.1em;">
+        COIL: <span id="bCoilActive">—</span>
+      </div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">SACK NEURONS — BLACK</div>
+      <div class="neuron-bars" id="bNeuronBars"></div>
+      <div style="margin-top:5px;font-size:0.48rem;opacity:0.4;letter-spacing:0.1em;">
+        ACT:<span id="bActive">0</span> DEAD:<span id="bDead">0</span> CONF:<span id="bConf">0.000</span>
+      </div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">CAPTURED BY BLACK</div>
+      <div class="caplist" id="bCaptured"></div>
+    </div>
+    <div class="panelbox bs">
+      <div class="paneltitle bk">SIGNAL</div>
+      <div class="presslog">
+        <div>MOVE: <span id="bAction" style="color:var(--textbright)">--</span></div>
+        <div>ΔFREEDOM: <span id="bDelta" style="color:var(--textbright)">--</span></div>
+        <div>THREAT: <span id="bThreat" style="color:#ffcc00">--</span></div>
+        <div>COIL POS: <span id="bCoilPos" style="color:var(--green)">--</span></div>
+        <div>CORTEX RES: <span id="bCortexRes" style="color:var(--bf)">--</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+var CHECK_WIN    = 25;
+var NEURON_COUNT = 50;
+var CHAIN_MAX    = 12;
+var CLUSTER_MAX  = 12;
+var COARSE_CELLS = 16;
+var SAVE_EVERY   = 25;
+var SK_WN        = 'sackchess4:neuronsW';
+var SK_BN        = 'sackchess4:neuronsB';
+var SK_META      = 'sackchess4:meta';
+
+// Lookahead
+var D2_SAMPLE    = 6;   // opponent counter moves to consider
+var D3_SAMPLE    = 4;   // our responses
+var D4_SAMPLE    = 3;
+var D5_SAMPLE    = 2;
+var D2_W         = 0.50;
+var D3_W         = 0.25;
+var D4_W         = 0.15;
+var D5_W         = 0.08;
+
+// ============================================================================
+// SPIRAL CORTEX
+// ============================================================================
+var SPIRAL_COILS = 8;
+var SPIRAL_BASE  = 8;
+var SPIRAL_MAP   = (function() {
+  var sizes = [], starts = [], total = 0;
+  for (var k = 0; k < SPIRAL_COILS; k++) {
+    sizes.push(SPIRAL_BASE * Math.pow(2, k));
+    starts.push(total);
+    total += SPIRAL_BASE * Math.pow(2, k);
+  }
+  return { sizes: sizes, starts: starts, total: total };
+})();
+var FIELD_SIZE = SPIRAL_MAP.total; // 2040
+
+function spiralCoil(pos) {
+  var p = ((pos % FIELD_SIZE) + FIELD_SIZE) % FIELD_SIZE;
+  for (var k = SPIRAL_COILS - 1; k >= 0; k--)
+    if (p >= SPIRAL_MAP.starts[k]) return k;
+  return 0;
+}
+
+function isCoilBoundary(pos) {
+  var p = ((pos % FIELD_SIZE) + FIELD_SIZE) % FIELD_SIZE;
+  for (var k = 0; k < SPIRAL_COILS; k++) {
+    var s = SPIRAL_MAP.starts[k], e = s + SPIRAL_MAP.sizes[k] - 1;
+    if (p === s || p === e) return true;
+  }
+  return false;
+}
+
+function coilRadius(pos) { return 4 + spiralCoil(pos) * 3; }
+
+// Direct board snapshot — 16 angular bins from king perspective
+// This is the ONLY encoding layer. No pressure field. No transformation.
+function pressureSnapshot(board, color) {
+  var kpos = getKingPos(board, color);
+  if (!kpos) return new Float32Array(COARSE_CELLS);
+  var kr = kpos[0], kf = kpos[1];
+  var bins = new Float32Array(COARSE_CELLS);
+  for (var r = 0; r < 8; r++) for (var f = 0; f < 8; f++) {
+    var p = board[r][f];
+    if (!p || (r === kr && f === kf)) continue;
+    var angle = Math.atan2(r - kr, f - kf);
+    var angleDeg = ((angle * 180 / Math.PI) + 180) % 180;
+    var cell = Math.floor(angleDeg / 180 * COARSE_CELLS) % COARSE_CELLS;
+    var dist = Math.hypot(f - kf, r - kr);
+    var weight = (PIECE_VALUE[p.type] || 1) / (dist + 1);
+    bins[cell] += p.color === color ? weight : -weight;
+  }
+  var max = 0;
+  for (var i = 0; i < COARSE_CELLS; i++) if (Math.abs(bins[i]) > max) max = Math.abs(bins[i]);
+  if (max > 0) for (var i = 0; i < COARSE_CELLS; i++) bins[i] /= max;
+  return bins;
+}
+
+// Snapshot delta -> spiral cortex position
+// High delta (tactical chaos) -> inner coil
+// Low delta (structural stability) -> outer coil
+// Phase flip at coil boundaries = regime transition signal
+function deltaToSpiralPos(snapBefore, snapAfter) {
+  var total = 0, maxD = 0, maxCell = 0, dirSum = 0;
+  for (var i = 0; i < COARSE_CELLS; i++) {
+    var d = Math.abs(snapAfter[i] - snapBefore[i]);
+    total += d; dirSum += (snapAfter[i] - snapBefore[i]);
+    if (d > maxD) { maxD = d; maxCell = i; }
+  }
+  var avg = total / COARSE_CELLS;
+  var direction = dirSum > 0 ? 1 : 0;
+  var normVal = 1 - Math.min(1, avg * 3);
+  var targetCoil = Math.min(SPIRAL_COILS - 1, Math.floor(normVal * SPIRAL_COILS));
+  var start = SPIRAL_MAP.starts[targetCoil];
+  var size  = SPIRAL_MAP.sizes[targetCoil];
+  var fraction = (normVal * SPIRAL_COILS) - targetCoil;
+  var angOffset = Math.floor((maxCell / COARSE_CELLS) * size);
+  var pos = (start + Math.floor(fraction * size) + angOffset + direction) % FIELD_SIZE;
+  if (isCoilBoundary(pos)) {
+    var c = spiralCoil(pos);
+    var cs = SPIRAL_MAP.starts[c], cz = SPIRAL_MAP.sizes[c];
+    pos = cs + (cz - 1 - (pos - cs));
+  }
+  return ((pos % FIELD_SIZE) + FIELD_SIZE) % FIELD_SIZE;
+}
+
+// ============================================================================
+// PIECE TABLES
+// ============================================================================
+var PIECES      = {wK:'\u2654',wQ:'\u2655',wR:'\u2656',wB:'\u2657',wN:'\u2658',wP:'\u2659',
+                   bK:'\u265A',bQ:'\u265B',bR:'\u265C',bB:'\u265D',bN:'\u265E',bP:'\u265F'};
+var PIECE_VALUE = {K:10,Q:9,R:5,B:3,N:3,P:1};
+var PIECE_THREAT= {K:0.5,Q:1.0,R:0.8,B:0.6,N:0.6,P:0.3};
+
+// ============================================================================
+// STORAGE
+// ============================================================================
+async function sto_set(key,val){
+  var s=JSON.stringify(val);
+  try{if(window.storage){await window.storage.set(key,s);return;}}catch(e){}
+  try{localStorage.setItem(key,s);}catch(e){}
+}
+async function sto_get(key){
+  try{if(window.storage){var r=await window.storage.get(key);return r&&r.value?JSON.parse(r.value):null;}}catch(e){}
+  try{var v=localStorage.getItem(key);return v?JSON.parse(v):null;}catch(e){return null;}
+}
+async function sto_del(key){
+  try{if(window.storage){await window.storage.delete(key);return;}}catch(e){}
+  try{localStorage.removeItem(key);}catch(e){}
+}
+
+// ============================================================================
+// SACK NEURON
+// ============================================================================
+function Neuron(nid) {
+  this.nid = nid;
+  this.field = new Float32Array(FIELD_SIZE);
+  this.activations = 0;
+  this.successes = 1;
+  this.failures = 0;
+  this.clusters = [];
+  this.coilHits = {};
+  // Distribute neurons across coils — early neurons seed inner, later seed outer
+  var coilIndex = Math.min(SPIRAL_COILS - 1, Math.floor((nid / NEURON_COUNT) * SPIRAL_COILS));
+  var start = SPIRAL_MAP.starts[coilIndex];
+  var size  = SPIRAL_MAP.sizes[coilIndex];
+  var peak  = start + Math.floor(Math.random() * size);
+  this.field[peak] = 1.0;
+  var r = coilRadius(peak);
+  for (var i = 1; i <= r; i++) {
+    var w = 1.0 - (i / (r + 1));
+    this.field[(peak + i) % FIELD_SIZE] = w;
+    this.field[(peak - i + FIELD_SIZE) % FIELD_SIZE] = w;
+  }
+  this.peakPos = peak;
+  this.coilHits[coilIndex] = 1;
+  // Mark boundary neurons — they translate between regimes
+  this.isBoundary = isCoilBoundary(peak);
+}
+
+Neuron.prototype.resonate = function(fieldPos) {
+  var raw = this.field[fieldPos];
+  var total = this.successes + this.failures + 0.001;
+  return raw * (this.successes / total);
+};
+
+Neuron.prototype.bounce = function(fieldPos, strength) {
+  var r = coilRadius(fieldPos);
+  var lift = 0.06 * Math.min(2.0, strength || 1.0);
+  var boundary = isCoilBoundary(fieldPos);
+  for (var i = 0; i < r; i++) {
+    var w = 1.0 - (i / r);
+    // Phase inversion at boundary — signal flips direction
+    var fwd = boundary ? (fieldPos - i + FIELD_SIZE) % FIELD_SIZE : (fieldPos + i) % FIELD_SIZE;
+    var bwd = boundary ? (fieldPos + i) % FIELD_SIZE : (fieldPos - i + FIELD_SIZE) % FIELD_SIZE;
+    this.field[fwd] = Math.min(1.0, this.field[fwd] + lift * w);
+    this.field[bwd] = Math.min(1.0, this.field[bwd] + lift * w);
+  }
+  this.activations++; this.successes++;
+  var c = spiralCoil(fieldPos);
+  this.coilHits[c] = (this.coilHits[c] || 0) + 1;
+};
+
+Neuron.prototype.dent = function(fieldPos) {
+  var r = coilRadius(fieldPos);
+  var boundary = isCoilBoundary(fieldPos);
+  for (var i = 0; i < r; i++) {
+    var w = 1.0 - (i / r);
+    var fwd = boundary ? (fieldPos - i + FIELD_SIZE) % FIELD_SIZE : (fieldPos + i) % FIELD_SIZE;
+    var bwd = boundary ? (fieldPos + i) % FIELD_SIZE : (fieldPos - i + FIELD_SIZE) % FIELD_SIZE;
+    this.field[fwd] = Math.max(-1.0, this.field[fwd] - 0.3 * w);
+    this.field[bwd] = Math.max(-1.0, this.field[bwd] - 0.3 * w);
+  }
+  this.failures++;
+};
+
+Neuron.prototype.dull = function(fieldPos) {
+  var r = Math.floor(coilRadius(fieldPos) * 0.6);
+  for (var i = 0; i < r; i++) {
+    var w = 1.0 - (i / r);
+    this.field[(fieldPos + i) % FIELD_SIZE] *= (1 - 0.08 * w);
+    this.field[(fieldPos - i + FIELD_SIZE) % FIELD_SIZE] *= (1 - 0.08 * w);
+  }
+};
+
+Neuron.prototype.dominantCoil = function() {
+  var best = 0, bestK = 0;
+  for (var k = 0; k < SPIRAL_COILS; k++) {
+    var h = this.coilHits[k] || 0;
+    if (h > best) { best = h; bestK = k; }
+  }
+  return bestK;
+};
+
+Neuron.prototype.storeCluster = function(chain) {
+  if (this.clusters.length >= CLUSTER_MAX) this.clusters.shift();
+  this.clusters.push(chain.slice(-CHAIN_MAX));
+};
+
+// ============================================================================
+// SACK ENGINE v4
+// ============================================================================
+function SACK(name) {
+  this.name = name;
+  this.neurons = [];
+  for (var i = 0; i < NEURON_COUNT; i++) this.neurons.push(new Neuron(i));
+  this.cellIndex = {};
+  for (var c = 0; c < COARSE_CELLS; c++) this.cellIndex[c] = [];
+  this.neurons.forEach(function(n) {
+    var c = Math.floor((n.peakPos / FIELD_SIZE) * COARSE_CELLS) % COARSE_CELLS;
+    this.cellIndex[c].push(n.nid);
+  }, this);
+  this.chain = [];
+  this.lastConf = 0;
+  this.totalChains = 0;
+  this.lastSpiralPos = 0;
+}
+
+SACK.prototype.rebuildIndex = function() {
+  for (var c = 0; c < COARSE_CELLS; c++) this.cellIndex[c] = [];
+  this.neurons.forEach(function(n) {
+    var c = Math.floor((n.peakPos / FIELD_SIZE) * COARSE_CELLS) % COARSE_CELLS;
+    this.cellIndex[c].push(n.nid);
+  }, this);
+};
+
+SACK.prototype.queryField = function(fieldPos) {
+  var coilIdx = Math.floor((fieldPos / FIELD_SIZE) * COARSE_CELLS) % COARSE_CELLS;
+  var candidates = [];
+  for (var c = coilIdx - 1; c <= coilIdx + 1; c++) {
+    var cc = (c + COARSE_CELLS) % COARSE_CELLS;
+    var nids = this.cellIndex[cc] || [];
+    for (var i = 0; i < nids.length; i++) candidates.push(nids[i]);
+  }
+  if (candidates.length < 4) for (var n = 0; n < NEURON_COUNT; n++) candidates.push(n);
+  var seen = {}, unique = [];
+  for (var j = 0; j < candidates.length; j++)
+    if (!seen[candidates[j]]) { seen[candidates[j]] = true; unique.push(candidates[j]); }
+  var best = -Infinity, bestNid = unique[0] || 0;
+  for (var k = 0; k < unique.length; k++) {
+    var r = this.neurons[unique[k]].resonate(fieldPos);
+    if (r > best) { best = r; bestNid = unique[k]; }
+  }
+  return { nid: bestNid, fieldPos: fieldPos, conf: best };
+};
+
+SACK.prototype.addLink = function(nid, fieldPos, snapBefore, snapAfter) {
+  var delta = 0;
+  for (var i = 0; i < COARSE_CELLS; i++) delta += Math.abs(snapAfter[i] - snapBefore[i]);
+  delta /= COARSE_CELLS;
+  var coil = spiralCoil(fieldPos);
+  var boundary = isCoilBoundary(fieldPos);
+  this.lastSpiralPos = fieldPos;
+  this.chain.push({ nid: nid, fieldPos: fieldPos, delta: delta, coil: coil, boundary: boundary });
+  if (this.chain.length >= CHAIN_MAX) {
+    this.neurons[nid].storeCluster(this.chain);
+    this.totalChains++;
+    this.chain = [];
+  }
+};
+
+SACK.prototype.reinforceOutcome = function(outcome) {
+  var chain = this.chain, len = chain.length;
+  if (len === 0) return;
+  for (var i = 0; i < len; i++) {
+    var link = chain[i], n = this.neurons[link.nid];
+    var recency = (i + 1) / len;
+    var boundaryAmp = link.boundary ? 1.5 : 1.0;
+    var coilWeight = 1.0 + (link.coil / SPIRAL_COILS) * 0.5;
+    if (outcome > 0) {
+      n.bounce(link.fieldPos, recency * (1 + link.delta * 2) * boundaryAmp * coilWeight);
+    } else if (outcome < 0) {
+      if (i === len - 1) n.dent(link.fieldPos);
+      else if (i >= len - 3) n.dull(link.fieldPos);
+      n.failures++;
+    } else {
+      n.dull(link.fieldPos);
+    }
+  }
+  if (outcome > 0) { this.neurons[chain[len-1].nid].storeCluster(chain); this.totalChains++; }
+  this.chain = [];
+  this.rebuildIndex();
+};
+
+SACK.prototype.reinforceCheck = function() {
+  var len = this.chain.length; if (len === 0) return;
+  var last = this.chain[len - 1];
+  this.neurons[last.nid].bounce(last.fieldPos, 0.4);
+};
+
+SACK.prototype.resetChain = function() { this.chain = []; };
+
+SACK.prototype.stats = function() {
+  var dead = 0, active = 0;
+  this.neurons.forEach(function(n) { if (n.activations === 0) dead++; else active++; });
+  return { active: active, dead: dead, conf: this.lastConf,
+           chainLen: this.chain.length, totalChains: this.totalChains,
+           spiralPos: this.lastSpiralPos };
+};
+
+SACK.prototype.serialise = function() {
+  return this.neurons.map(function(n) {
+    return { activations: n.activations, successes: n.successes, failures: n.failures,
+             peakPos: n.peakPos, field: Array.from(n.field),
+             clusters: n.clusters, coilHits: n.coilHits || {} };
+  });
+};
+
+SACK.prototype.deserialise = function(data) {
+  for (var i = 0; i < Math.min(data.length, this.neurons.length); i++) {
+    var d = data[i], n = this.neurons[i];
+    n.activations = d.activations; n.successes = d.successes; n.failures = d.failures;
+    n.peakPos = d.peakPos; n.clusters = d.clusters || [];
+    n.coilHits = d.coilHits || {};
+    n.field = new Float32Array(d.field);
+  }
+  this.rebuildIndex();
+};
+
+// ============================================================================
+// BOARD LOGIC
+// ============================================================================
+function initialBoard() {
+  var b = [], back = ['R','N','B','Q','K','B','N','R'];
+  for (var r = 0; r < 8; r++) { b[r] = []; for (var f = 0; f < 8; f++) b[r][f] = null; }
+  for (var f = 0; f < 8; f++) { b[0][f]={color:'b',type:back[f]}; b[1][f]={color:'b',type:'P'}; b[6][f]={color:'w',type:'P'}; b[7][f]={color:'w',type:back[f]}; }
+  return b;
+}
+function cloneBoard(b) {
+  var nb=[];
+  for(var r=0;r<8;r++){nb[r]=[];for(var f=0;f<8;f++)nb[r][f]=b[r][f]?{color:b[r][f].color,type:b[r][f].type}:null;}
+  return nb;
+}
+function inBounds(r,f){return r>=0&&r<8&&f>=0&&f<8;}
+function getKingPos(board,color){
+  for(var r=0;r<8;r++)for(var f=0;f<8;f++)if(board[r][f]&&board[r][f].color===color&&board[r][f].type==='K')return[r,f];
+  return null;
+}
+function isSquareAttacked(board,r,f,byColor){
+  var pd=byColor==='w'?1:-1;
+  for(var df=-1;df<=1;df+=2){var pr=r+pd,pf=f+df;if(inBounds(pr,pf)&&board[pr][pf]&&board[pr][pf].color===byColor&&board[pr][pf].type==='P')return true;}
+  var nm=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  for(var i=0;i<nm.length;i++){var nr=r+nm[i][0],nf=f+nm[i][1];if(inBounds(nr,nf)&&board[nr][nf]&&board[nr][nf].color===byColor&&board[nr][nf].type==='N')return true;}
+  for(var dr=-1;dr<=1;dr++)for(var df2=-1;df2<=1;df2++){if(!dr&&!df2)continue;var kr=r+dr,kf=f+df2;if(inBounds(kr,kf)&&board[kr][kf]&&board[kr][kf].color===byColor&&board[kr][kf].type==='K')return true;}
+  var st=[[0,1],[0,-1],[1,0],[-1,0]];
+  for(var i=0;i<st.length;i++){var cr=r+st[i][0],cf=f+st[i][1];while(inBounds(cr,cf)){var p=board[cr][cf];if(p){if(p.color===byColor&&(p.type==='R'||p.type==='Q'))return true;break;}cr+=st[i][0];cf+=st[i][1];}}
+  var dg=[[1,1],[1,-1],[-1,1],[-1,-1]];
+  for(var i=0;i<dg.length;i++){var cr=r+dg[i][0],cf=f+dg[i][1];while(inBounds(cr,cf)){var p=board[cr][cf];if(p){if(p.color===byColor&&(p.type==='B'||p.type==='Q'))return true;break;}cr+=dg[i][0];cf+=dg[i][1];}}
+  return false;
+}
+function isInCheck(board,color){var kp=getKingPos(board,color);if(!kp)return false;return isSquareAttacked(board,kp[0],kp[1],color==='w'?'b':'w');}
+function getPieceMoves(board,r,f,checkLegality){
+  var p=board[r][f];if(!p)return[];var moves=[],opp=p.color==='w'?'b':'w';
+  function tryAdd(tr,tf){
+    if(!inBounds(tr,tf))return;if(board[tr][tf]&&board[tr][tf].color===p.color)return;
+    if(checkLegality){var nb=cloneBoard(board);nb[tr][tf]=nb[r][f];nb[r][f]=null;if(!isInCheck(nb,p.color))moves.push([tr,tf]);}
+    else moves.push([tr,tf]);
+  }
+  function slide(dirs){for(var i=0;i<dirs.length;i++){var dr=dirs[i][0],df=dirs[i][1],cr=r+dr,cf=f+df;while(inBounds(cr,cf)){if(board[cr][cf]){if(board[cr][cf].color===opp)tryAdd(cr,cf);break;}tryAdd(cr,cf);cr+=dr;cf+=df;}}}
+  if(p.type==='P'){var dir=p.color==='w'?-1:1,start=p.color==='w'?6:1;if(inBounds(r+dir,f)&&!board[r+dir][f]){tryAdd(r+dir,f);if(r===start&&!board[r+dir][f]&&!board[r+2*dir][f])tryAdd(r+2*dir,f);}for(var df3=-1;df3<=1;df3+=2)if(inBounds(r+dir,f+df3)&&board[r+dir][f+df3]&&board[r+dir][f+df3].color===opp)tryAdd(r+dir,f+df3);}
+  else if(p.type==='N'){var nm2=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];for(var i=0;i<nm2.length;i++)tryAdd(r+nm2[i][0],f+nm2[i][1]);}
+  else if(p.type==='B')slide([[1,1],[1,-1],[-1,1],[-1,-1]]);
+  else if(p.type==='R')slide([[0,1],[0,-1],[1,0],[-1,0]]);
+  else if(p.type==='Q')slide([[1,1],[1,-1],[-1,1],[-1,-1],[0,1],[0,-1],[1,0],[-1,0]]);
+  else if(p.type==='K'){for(var dr=-1;dr<=1;dr++)for(var df4=-1;df4<=1;df4++)if(dr||df4)tryAdd(r+dr,f+df4);}
+  return moves;
+}
+function getAllMoves(board,color){
+  var moves=[];
+  for(var r=0;r<8;r++)for(var f=0;f<8;f++)if(board[r][f]&&board[r][f].color===color){var pm=getPieceMoves(board,r,f,true);for(var i=0;i<pm.length;i++)moves.push({from:[r,f],to:pm[i]});}
+  return moves;
+}
+function boardPower(board,color){
+  var t=0;
+  for(var r=0;r<8;r++)for(var f=0;f<8;f++){var p=board[r][f];if(p&&p.color===color)t+=PIECE_VALUE[p.type]||0;}
+  return t;
+}
+
+// ============================================================================
+// THREAT PROXIMITY METRIC
+// Measures geometric convergence of our attack vectors on opponent king
+// Pure board geometry — no memory, no field
+// Returns 0-1 score: 1 = mate imminent, 0 = no threat
+// ============================================================================
+function threatProximity(board, color) {
+  var opp = color === 'w' ? 'b' : 'w';
+  var kpos = getKingPos(board, opp);
+  if (!kpos) return 1.0; // king gone = max threat
+  var kr = kpos[0], kf = kpos[1];
+  var score = 0;
+  // Count attack lines converging on opponent king
+  for (var r = 0; r < 8; r++) for (var f = 0; f < 8; f++) {
+    var p = board[r][f];
+    if (!p || p.color !== color) continue;
+    var moves = getPieceMoves(board, r, f, false);
+    for (var i = 0; i < moves.length; i++) {
+      var tr = moves[i][0], tf = moves[i][1];
+      // Distance from this move's destination to opponent king
+      var dist = Math.max(Math.abs(tr - kr), Math.abs(tf - kf));
+      if (dist === 0) { score += (PIECE_THREAT[p.type] || 0.5) * 3.0; } // direct check
+      else if (dist === 1) { score += (PIECE_THREAT[p.type] || 0.5) * 1.5; }
+      else if (dist <= 3) { score += (PIECE_THREAT[p.type] || 0.5) * (0.5 / dist); }
+    }
+  }
+  // Opponent king escape count — fewer escapes = higher threat
+  var oppMoves = getPieceMoves(board, kr, kf, true).length;
+  var escapePenalty = Math.max(0, 1 - oppMoves / 8);
+  score += escapePenalty * 2.0;
+  // Check bonus
+  if (isInCheck(board, opp)) score += 5.0;
+  return Math.min(1.0, score / 15.0);
+}
+
+// King freedom — pure board geometry
+function kingFreedom(board, color) {
+  var kpos = getKingPos(board, color);
+  if (!kpos) return 0;
+  var moves = getPieceMoves(board, kpos[0], kpos[1], true).length;
+  return moves / 8;
+}
+
+// ============================================================================
+// MOVE SCORING — direct cortex + threat geometry
+// No pressure field. No translation layer.
+// ============================================================================
+function scoreMove(board, color, move, sack, visitedSquares) {
+  var nb = cloneBoard(board), opp = color === 'w' ? 'b' : 'w';
+  nb[move.to[0]][move.to[1]] = nb[move.from[0]][move.from[1]];
+  nb[move.from[0]][move.from[1]] = null;
+  if (nb[move.to[0]][move.to[1]].type === 'P' && (move.to[0] === 0 || move.to[0] === 7))
+    nb[move.to[0]][move.to[1]].type = 'Q';
+  var kpos = getKingPos(nb, color);
+  if (!kpos) return -Infinity;
+
+  var score = 0;
+
+  // 1. Direct cortex resonance — what does the spiral cortex think of this state?
+  var snapBefore = pressureSnapshot(board, color);
+  var snapAfter  = pressureSnapshot(nb, color);
+  var spiralPos  = deltaToSpiralPos(snapBefore, snapAfter);
+  var cortexRes  = sack.queryField(spiralPos);
+  score += cortexRes.conf * 5.0;
+
+  // 2. Threat proximity — how close does this get us to check/mate?
+  var threat = threatProximity(nb, color);
+  score += threat * 8.0;
+
+  // 3. Our king safety after move
+  var freedom = kingFreedom(nb, color);
+  score += freedom * 3.0;
+
+  // 4. Check delivery
+  if (isInCheck(nb, opp)) score += 10.0;
+
+  // 5. Repetition penalty
+  var vKey = kpos[0] + '_' + kpos[1];
+  score -= (visitedSquares[vKey] || 0) * 4;
+
+  return score;
+}
+
+// ============================================================================
+// THREAT FUNNEL LOOKAHEAD — 5 move chain
+// Check 1: all our moves
+// Check 2: best opponent counter to each
+// Depths 3-5: threat-weighted sampling
+// ============================================================================
+function lookaheadScore(board, color, move, sack) {
+  var opp = color === 'w' ? 'b' : 'w';
+
+  // Apply our move
+  var nb1 = cloneBoard(board);
+  nb1[move.to[0]][move.to[1]] = nb1[move.from[0]][move.from[1]];
+  nb1[move.from[0]][move.from[1]] = null;
+  if (nb1[move.to[0]][move.to[1]] && nb1[move.to[0]][move.to[1]].type === 'P' &&
+      (move.to[0] === 0 || move.to[0] === 7)) nb1[move.to[0]][move.to[1]].type = 'Q';
+
+  var snapBase = pressureSnapshot(board, color);
+  var snap1    = pressureSnapshot(nb1, color);
+  var sp1      = deltaToSpiralPos(snapBase, snap1);
+  var d1conf   = sack.queryField(sp1).conf;
+  var d1threat = threatProximity(nb1, color);
+  var score    = d1conf + d1threat * D2_W;
+
+  // Check 2: opponent best counter
+  var oppMoves = getAllMoves(nb1, opp);
+  if (oppMoves.length === 0) return score + 2.0; // opponent has no moves = great
+
+  // Score opponent moves — opponent picks highest threat against us
+  var oppScored = [];
+  var sample2 = oppMoves.length > D2_SAMPLE ? oppMoves.slice(0, D2_SAMPLE) : oppMoves;
+  for (var i = 0; i < sample2.length; i++) {
+    var nb2 = cloneBoard(nb1);
+    nb2[sample2[i].to[0]][sample2[i].to[1]] = nb2[sample2[i].from[0]][sample2[i].from[1]];
+    nb2[sample2[i].from[0]][sample2[i].from[1]] = null;
+    var oppThreat = threatProximity(nb2, opp); // opponent's threat on us
+    oppScored.push({ move: sample2[i], board: nb2, threat: oppThreat });
+  }
+  // Sort by opponent threat descending — take their best counter
+  oppScored.sort(function(a,b){ return b.threat - a.threat; });
+  var bestCounter = oppScored[0];
+  // Their best counter penalises our score
+  score -= bestCounter.threat * D2_W;
+
+  // Depth 3: our response to their counter
+  var ourMoves3 = getAllMoves(bestCounter.board, color);
+  if (ourMoves3.length > 0) {
+    var sample3 = ourMoves3.length > D3_SAMPLE ? ourMoves3.slice(0, D3_SAMPLE) : ourMoves3;
+    var bestD3 = -Infinity;
+    var bestBoard3 = null;
+    for (var j = 0; j < sample3.length; j++) {
+      var nb3 = cloneBoard(bestCounter.board);
+      nb3[sample3[j].to[0]][sample3[j].to[1]] = nb3[sample3[j].from[0]][sample3[j].from[1]];
+      nb3[sample3[j].from[0]][sample3[j].from[1]] = null;
+      var snap3 = pressureSnapshot(nb3, color);
+      var sp3   = deltaToSpiralPos(snap1, snap3);
+      var t3    = threatProximity(nb3, color) - threatProximity(nb3, opp) * 0.5;
+      var r3    = sack.queryField(sp3).conf;
+      var s3    = r3 + t3;
+      if (s3 > bestD3) { bestD3 = s3; bestBoard3 = nb3; }
+    }
+    score += bestD3 * D3_W;
+
+    // Depth 4: opponent counter to our depth 3
+    if (bestBoard3) {
+      var oppMoves4 = getAllMoves(bestBoard3, opp);
+      if (oppMoves4.length > 0) {
+        var sample4 = oppMoves4.length > D4_SAMPLE ? oppMoves4.slice(0, D4_SAMPLE) : oppMoves4;
+        var bestOppD4 = -Infinity, bestBoard4 = null;
+        for (var k = 0; k < sample4.length; k++) {
+          var nb4 = cloneBoard(bestBoard3);
+          nb4[sample4[k].to[0]][sample4[k].to[1]] = nb4[sample4[k].from[0]][sample4[k].from[1]];
+          nb4[sample4[k].from[0]][sample4[k].from[1]] = null;
+          var t4opp = threatProximity(nb4, opp);
+          if (t4opp > bestOppD4) { bestOppD4 = t4opp; bestBoard4 = nb4; }
+        }
+        score -= bestOppD4 * D4_W;
+
+        // Depth 5: our final response
+        if (bestBoard4) {
+          var ourMoves5 = getAllMoves(bestBoard4, color);
+          if (ourMoves5.length > 0) {
+            var sample5 = ourMoves5.length > D5_SAMPLE ? ourMoves5.slice(0, D5_SAMPLE) : ourMoves5;
+            var bestD5 = -Infinity;
+            for (var m = 0; m < sample5.length; m++) {
+              var nb5 = cloneBoard(bestBoard4);
+              nb5[sample5[m].to[0]][sample5[m].to[1]] = nb5[sample5[m].from[0]][sample5[m].from[1]];
+              nb5[sample5[m].from[0]][sample5[m].from[1]] = null;
+              var snap5 = pressureSnapshot(nb5, color);
+              var sp5   = deltaToSpiralPos(snap3 || snap1, snap5);
+              var t5    = threatProximity(nb5, color);
+              var r5    = sack.queryField(sp5).conf;
+              if ((r5 + t5) > bestD5) bestD5 = r5 + t5;
+            }
+            score += bestD5 * D5_W;
+          }
+        }
+      }
+    }
+  }
+
+  return score;
+}
+
+// ============================================================================
+// GAME STATE
+// ============================================================================
+function freshState() {
+  return { board: initialBoard(), turn: 'w', moveCount: 0,
+           firstMoveW: true, firstMoveB: true, gameOver: false,
+           wCaptured: [], bCaptured: [], wFreedom: 1, bFreedom: 1,
+           wLastMove: null, bLastMove: null, wVisited: {}, bVisited: {},
+           wChecks: 0, bChecks: 0, wPower: 39, bPower: 39 };
+}
+
+var state       = freshState();
+var sackW       = new SACK('White');
+var sackB       = new SACK('Black');
+var generations = 0;
+var wWins = 0, bWins = 0;
+var running = false, intervalId = null;
+var autoRunActive = false, autoRunTarget = 700, autoRunStartGen = 0;
+
+// ============================================================================
+// SPIRAL CORTEX RENDERER
+// Concentric rings = coils. Inner = tactical, outer = structural.
+// Brightness = activation density. Hot neurons glow.
+// ============================================================================
+function renderSpiralCortex(canvasId, sack, isWhite) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height, cx = W/2, cy = H/2;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.beginPath(); ctx.arc(cx, cy, cx - 2, 0, Math.PI*2);
+  ctx.fillStyle = '#050e15'; ctx.fill();
+
+  var mainColor = isWhite ? [0,229,255] : [255,61,110];
+
+  // Draw coils from outside in
+  for (var k = SPIRAL_COILS - 1; k >= 0; k--) {
+    var r = (cx - 4) * (k + 1) / SPIRAL_COILS;
+    var start = SPIRAL_MAP.starts[k];
+    var size  = SPIRAL_MAP.sizes[k];
+
+    // Gather activation density for this coil
+    var coilAct = 0, coilCount = 0;
+    for (var ni = 0; ni < NEURON_COUNT; ni++) {
+      var n = sack.neurons[ni];
+      if (spiralCoil(n.peakPos) === k) {
+        coilAct += n.activations;
+        coilCount++;
+      }
+    }
+    var avgAct = coilCount > 0 ? coilAct / coilCount : 0;
+    var intensity = Math.min(1, avgAct / 20);
+
+    // Draw coil ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(' + mainColor[0] + ',' + mainColor[1] + ',' + mainColor[2] + ',' + (0.08 + intensity * 0.3) + ')';
+    ctx.lineWidth = k === 0 ? 1.5 : 0.8;
+    ctx.stroke();
+
+    // Draw active neurons on this coil as dots
+    for (var ni = 0; ni < NEURON_COUNT; ni++) {
+      var n = sack.neurons[ni];
+      if (n.activations === 0) continue;
+      if (spiralCoil(n.peakPos) !== k) continue;
+      var localPos = n.peakPos - start;
+      var angle = (localPos / size) * Math.PI * 2 - Math.PI / 2;
+      var nx = cx + Math.cos(angle) * r;
+      var ny = cy + Math.sin(angle) * r;
+      var actIntensity = Math.min(1, n.activations / 20);
+      var dotR = n.isBoundary ? 3.5 : 2;
+      // Coil colour: inner=cyan/pink, outer=warm
+      var coilPct = k / (SPIRAL_COILS - 1);
+      var h = isWhite ? (180 - coilPct * 150) : (340 + coilPct * 30);
+      ctx.beginPath();
+      ctx.arc(nx, ny, dotR, 0, Math.PI*2);
+      ctx.fillStyle = 'hsla(' + h + ',80%,' + (40 + actIntensity * 30) + '%,' + (0.4 + actIntensity * 0.6) + ')';
+      ctx.fill();
+      if (n.isBoundary) {
+        ctx.beginPath(); ctx.arc(nx, ny, dotR + 1.5, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5; ctx.stroke();
+      }
+    }
+  }
+
+  // Centre dot — current chain position
+  if (sack.chain.length > 0) {
+    var last = sack.chain[sack.chain.length - 1];
+    var c = spiralCoil(last.fieldPos);
+    var pr = (cx - 4) * (c + 1) / SPIRAL_COILS;
+    var start2 = SPIRAL_MAP.starts[c];
+    var size2   = SPIRAL_MAP.sizes[c];
+    var lp = last.fieldPos - start2;
+    var ang = (lp / size2) * Math.PI * 2 - Math.PI / 2;
+    var px = cx + Math.cos(ang) * pr;
+    var py = cy + Math.sin(ang) * pr;
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(' + mainColor[0] + ',' + mainColor[1] + ',' + mainColor[2] + ',0.9)';
+    ctx.fill();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(' + mainColor[0] + ',' + mainColor[1] + ',' + mainColor[2] + ',0.8)';
+    ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // Outer ring
+  ctx.beginPath(); ctx.arc(cx, cy, cx - 2, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(' + mainColor[0] + ',' + mainColor[1] + ',' + mainColor[2] + ',0.15)';
+  ctx.lineWidth = 1; ctx.stroke();
+}
+
+// ============================================================================
+// NEURON BAR RENDERER
+// ============================================================================
+function renderNeuronBars(gridId, sack, isWhite) {
+  var grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (var i = 0; i < NEURON_COUNT; i++) {
+    var n = sack.neurons[i];
+    var bar = document.createElement('div');
+    bar.className = 'n-bar';
+    if (n.activations === 0) {
+      bar.style.background = '#1a0a0a';
+      bar.style.height = '3px';
+    } else {
+      var dc = n.dominantCoil();
+      var coilPct = dc / (SPIRAL_COILS - 1);
+      var h = isWhite ? (180 - coilPct * 150) : (340 + coilPct * 30);
+      var lit = 35 + Math.min(30, n.activations * 0.8);
+      bar.style.background = 'hsl(' + h + ',75%,' + lit + '%)';
+      bar.style.height = Math.min(32, 3 + n.activations * 0.5) + 'px';
+      if (n.activations > 20) bar.style.boxShadow = '0 0 4px hsl(' + h + ',80%,65%)';
+      if (n.isBoundary) bar.style.outline = '1px solid rgba(255,255,255,0.3)';
+    }
+    bar.title = 'N' + i + ' coil:' + n.dominantCoil() + ' act:' + n.activations;
+    grid.appendChild(bar);
+  }
+}
+
+// ============================================================================
+// BOARD RENDER
+// ============================================================================
+function renderBoard() {
+  var boardEl = document.getElementById('board'); if (!boardEl) return;
+  boardEl.innerHTML = '';
+  var ranks=['8','7','6','5','4','3','2','1'], files=['a','b','c','d','e','f','g','h'];
+  var wCheck=isInCheck(state.board,'w'), bCheck=isInCheck(state.board,'b');
+  var wFrom=state.wLastMove?(state.wLastMove.from[0]+'_'+state.wLastMove.from[1]):null;
+  var wTo=state.wLastMove?(state.wLastMove.to[0]+'_'+state.wLastMove.to[1]):null;
+  var bFrom=state.bLastMove?(state.bLastMove.from[0]+'_'+state.bLastMove.from[1]):null;
+  var bTo=state.bLastMove?(state.bLastMove.to[0]+'_'+state.bLastMove.to[1]):null;
+  for(var r=0;r<8;r++) for(var f=0;f<8;f++){
+    var cell=document.createElement('div'), rfs=r+'_'+f;
+    cell.className='cell '+((r+f)%2===0?'light':'dark');
+    if(rfs===wFrom||rfs===wTo) cell.className+=' hlw';
+    if(rfs===bFrom||rfs===bTo) cell.className+=' hlb';
+    var p=state.board[r][f];
+    if(p){var span=document.createElement('span');span.textContent=PIECES[p.color+p.type];span.className='piece-'+p.color;if(p.type==='K'&&p.color==='w'&&wCheck)span.className+=' king-check';if(p.type==='K'&&p.color==='b'&&bCheck)span.className+=' king-check';cell.appendChild(span);}
+    if(f===7){var c=document.createElement('span');c.className='coord coord-rank';c.textContent=ranks[r];cell.appendChild(c);}
+    if(r===7){var c=document.createElement('span');c.className='coord coord-file';c.textContent=files[f];cell.appendChild(c);}
+    boardEl.appendChild(cell);
+  }
+}
+
+function el(id){return document.getElementById(id);}
+
+function updateUI() {
+  var wPct=Math.round(state.wFreedom*100), bPct=Math.round(state.bFreedom*100);
+  if(el('wFreedomPct'))el('wFreedomPct').textContent=wPct+'%';
+  if(el('wFreedomBar'))el('wFreedomBar').style.width=wPct+'%';
+  if(el('bFreedomPct'))el('bFreedomPct').textContent=bPct+'%';
+  if(el('bFreedomBar'))el('bFreedomBar').style.width=bPct+'%';
+  if(el('genNum'))el('genNum').textContent=generations;
+  if(el('wWins'))el('wWins').textContent=wWins;
+  if(el('bWins'))el('bWins').textContent=bWins;
+  if(el('moveCount'))el('moveCount').textContent=state.moveCount;
+  if(el('totalChains'))el('totalChains').textContent=sackW.totalChains+sackB.totalChains;
+  if(el('wChains'))el('wChains').textContent=sackW.totalChains;
+  if(el('bChains'))el('bChains').textContent=sackB.totalChains;
+  var wc=state.wChecks,bc=state.bChecks;
+  if(el('wCheckNum'))el('wCheckNum').textContent=wc;
+  if(el('bCheckNum'))el('bCheckNum').textContent=bc;
+  if(el('wCheckBar'))el('wCheckBar').style.width=Math.min(100,(wc/CHECK_WIN)*100)+'%';
+  if(el('bCheckBar'))el('bCheckBar').style.width=Math.min(100,(bc/CHECK_WIN)*100)+'%';
+  if(el('wCaptured'))el('wCaptured').textContent=state.wCaptured.map(function(t){return PIECES['b'+t]||'';}).join('');
+  if(el('bCaptured'))el('bCaptured').textContent=state.bCaptured.map(function(t){return PIECES['w'+t]||'';}).join('');
+  if(el('wNeurons'))el('wNeurons').textContent=NEURON_COUNT;
+  if(el('bNeurons'))el('bNeurons').textContent=NEURON_COUNT;
+  var ws=sackW.stats(), bs=sackB.stats();
+  if(el('wActive'))el('wActive').textContent=ws.active;
+  if(el('wDead'))el('wDead').textContent=ws.dead;
+  if(el('wConf'))el('wConf').textContent=ws.conf.toFixed(3);
+  if(el('bActive'))el('bActive').textContent=bs.active;
+  if(el('bDead'))el('bDead').textContent=bs.dead;
+  if(el('bConf'))el('bConf').textContent=bs.conf.toFixed(3);
+  if(el('chainLen'))el('chainLen').textContent=(state.turn==='w'?sackW:sackB).chain.length;
+  if(el('turnW'))el('turnW').classList.toggle('active',state.turn==='w');
+  if(el('turnB'))el('turnB').classList.toggle('active',state.turn==='b');
+  // Coil active display
+  function activeCoil(sack) {
+    if (sack.chain.length === 0) return '—';
+    var last = sack.chain[sack.chain.length-1];
+    return spiralCoil(last.fieldPos) + (last.boundary?' [BOUNDARY]':'');
+  }
+  if(el('wCoilActive'))el('wCoilActive').textContent=activeCoil(sackW);
+  if(el('bCoilActive'))el('bCoilActive').textContent=activeCoil(sackB);
+}
+
+function log(msg,cls){
+  var box=document.getElementById('gameLog');if(!box)return;
+  var div=document.createElement('div');div.className='log-entry '+(cls||'');div.textContent=msg;
+  box.appendChild(div);box.scrollTop=box.scrollHeight;
+  while(box.children.length>150)box.removeChild(box.firstChild);
+}
+
+// ============================================================================
+// WIN HANDLER — no merge, independent fields
+// ============================================================================
+async function handleWin(winnerColor) {
+  var winSack  = winnerColor==='w'?sackW:sackB;
+  var loseSack = winnerColor==='w'?sackB:sackW;
+  var winName  = winnerColor==='w'?'WHITE':'BLACK';
+
+  // Independent reinforcement — no cross-contamination
+  winSack.reinforceOutcome(1);
+  loseSack.reinforceOutcome(-1);
+
+  log('✦ ' + winName + ' WINS — W CHAINS:' + sackW.totalChains + ' B CHAINS:' + sackB.totalChains, 'win');
+
+  if (autoRunActive) {
+    var gr = generations - autoRunStartGen;
+    if (gr % SAVE_EVERY === 0) {
+      await sto_set(SK_WN, sackW.serialise());
+      await sto_set(SK_BN, sackB.serialise());
+      await sto_set(SK_META, {generations:generations,wWins:wWins,bWins:bWins});
+    }
+    updateAutoRunProgress();
+    if (gr >= autoRunTarget) {
+      autoRunActive = false; clearInterval(intervalId); running = false;
+      await sto_set(SK_WN,sackW.serialise()); await sto_set(SK_BN,sackB.serialise());
+      await sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins});
+      if(el('btnAutoRun'))el('btnAutoRun').classList.remove('active');
+      log('★★★ AUTO-RUN COMPLETE — '+gr+' GAMES ★★★','win');
+      return;
+    }
+    endGeneration(); return;
+  }
+
+  await sto_set(SK_WN,sackW.serialise());
+  await sto_set(SK_BN,sackB.serialise());
+  await sto_set(SK_META,{generations:generations,wWins:wWins,bWins:bWins});
+
+  var overlay=el('overlay'),winBox=el('winBox');
+  if(overlay&&winBox){
+    winBox.className='win-box '+(winnerColor==='w'?'ww':'bw');
+    el('winName').textContent=winName;
+    el('winDetail').textContent=state[winnerColor+'Checks']+' CHECKS  ·  GEN '+generations+'  ·  MOVES '+state.moveCount;
+    el('winChain').textContent='✦ W CHAINS:'+sackW.totalChains+' B CHAINS:'+sackB.totalChains+' — FIELDS INDEPENDENT';
+    overlay.classList.add('show');
+  }
+  clearInterval(intervalId); running=false;
+  if(el('btnStart'))el('btnStart').disabled=false;
+  if(el('btnPause'))el('btnPause').disabled=true;
+}
+
+function endGeneration() {
+  generations++;
+  log('── GEN '+generations+' END · MOVES:'+state.moveCount+' · W:'+sackW.totalChains+' B:'+sackB.totalChains+' ──','important');
+  sackW.resetChain(); sackB.resetChain();
+  state = freshState();
+  renderBoard(); updateUI();
+}
+
+function updateAutoRunProgress() {
+  var gr=Math.max(0,generations-autoRunStartGen);
+  var pct=autoRunActive?Math.min(100,(gr/autoRunTarget)*100):(gr>=autoRunTarget?100:0);
+  if(el('arProgressFill'))el('arProgressFill').style.width=pct+'%';
+  if(el('arProgressLabel'))el('arProgressLabel').textContent=autoRunActive||gr>0?gr+'/'+autoRunTarget:'—';
+  if(el('btnAutoRun')){var tgt=parseInt(el('arTarget').value)||700;el('btnAutoRun').textContent=autoRunActive?('■ STOP ('+gr+')'):'▶▶ RUN '+tgt;}
+}
+
+// ============================================================================
+// GAME TICK
+// ============================================================================
+function doTick() {
+  if (state.gameOver) { endGeneration(); return; }
+  var color=state.turn, opp=color==='w'?'b':'w';
+  var sack=color==='w'?sackW:sackB;
+  var isFirst=color==='w'?state.firstMoveW:state.firstMoveB;
+  var allMoves=getAllMoves(state.board,color);
+  var files2=['a','b','c','d','e','f','g','h'];
+
+  if (allMoves.length===0) {
+    var msg=isInCheck(state.board,color)?'CHECKMATE — '+opp.toUpperCase()+' WINS':'STALEMATE';
+    log(msg,'important check'); state.gameOver=true;
+    var winner=isInCheck(state.board,color)?opp:null;
+    if(winner){if(winner==='w')wWins++;else bWins++;handleWin(winner);return;}
+    sackW.reinforceOutcome(0);sackB.reinforceOutcome(0);
+    if(autoRunActive){updateAutoRunProgress();var gr2=generations-autoRunStartGen;if(gr2>=autoRunTarget){autoRunActive=false;}else{endGeneration();}}
+    return;
+  }
+
+  var chosenMove;
+  var snapBefore = pressureSnapshot(state.board, color);
+
+  if (isFirst) {
+    chosenMove=allMoves[Math.floor(Math.random()*Math.min(18,allMoves.length))];
+    if(color==='w')state.firstMoveW=false;else state.firstMoveB=false;
+    log(color.toUpperCase()+' OPENING RANDOM',color==='w'?'w-event':'b-event');
+  } else {
+    var vs=color==='w'?state.wVisited:state.bVisited;
+    var best=-Infinity;
+    for(var i=0;i<allMoves.length;i++){
+      // Combined score: base scoring + 5-move lookahead
+      var baseScore = scoreMove(state.board,color,allMoves[i],sack,vs);
+      var laScore   = lookaheadScore(state.board,color,allMoves[i],sack);
+      var total = baseScore * 0.4 + laScore * 0.6;
+      if(total>best){best=total;chosenMove=allMoves[i];}
+    }
+  }
+
+  if(!chosenMove){log('ERROR: No move','important');state.gameOver=true;return;}
+
+  // Execute move
+  var captured=state.board[chosenMove.to[0]][chosenMove.to[1]];
+  state.board[chosenMove.to[0]][chosenMove.to[1]]=state.board[chosenMove.from[0]][chosenMove.from[1]];
+  state.board[chosenMove.from[0]][chosenMove.from[1]]=null;
+  if(state.board[chosenMove.to[0]][chosenMove.to[1]].type==='P'&&(chosenMove.to[0]===0||chosenMove.to[0]===7)){
+    state.board[chosenMove.to[0]][chosenMove.to[1]].type='Q';
+    log(color.toUpperCase()+' PAWN PROMOTED',color==='w'?'w-event':'b-event');
+  }
+
+  // SACK chain link — direct snapshot to spiral cortex
+  var snapAfter = pressureSnapshot(state.board, color);
+  var spiralPos = deltaToSpiralPos(snapBefore, snapAfter);
+  var cortexRes = sack.queryField(spiralPos);
+  sack.lastConf  = cortexRes.conf;
+  sack.addLink(cortexRes.nid, spiralPos, snapBefore, snapAfter);
+
+  // Update freedom
+  var freedom = kingFreedom(state.board, color);
+  var threat  = threatProximity(state.board, color);
+  var preFreed = color==='w'?state.wFreedom:state.bFreedom;
+  if(color==='w')state.wFreedom=freedom;else state.bFreedom=freedom;
+
+  // Visited tracking
+  var kpos=getKingPos(state.board,color);
+  if(kpos){var vKey=kpos[0]+'_'+kpos[1];var vs2=color==='w'?state.wVisited:state.bVisited;vs2[vKey]=(vs2[vKey]||0)+1;}
+
+  // Move notation
+  var ms=files2[chosenMove.from[1]]+(8-chosenMove.from[0])+'→'+files2[chosenMove.to[1]]+(8-chosenMove.to[0]);
+
+  // Update signal display
+  if(color==='w'){
+    state.wLastMove=chosenMove;
+    if(el('wAction'))el('wAction').textContent=ms;
+    if(el('wDelta'))el('wDelta').textContent=((freedom-preFreed)>=0?'+':'')+(freedom-preFreed).toFixed(3);
+    if(el('wThreat'))el('wThreat').textContent=threat.toFixed(3);
+    if(el('wCoilPos'))el('wCoilPos').textContent='C'+spiralCoil(spiralPos)+':'+spiralPos;
+    if(el('wCortexRes'))el('wCortexRes').textContent=cortexRes.conf.toFixed(3);
+  } else {
+    state.bLastMove=chosenMove;
+    if(el('bAction'))el('bAction').textContent=ms;
+    if(el('bDelta'))el('bDelta').textContent=((freedom-preFreed)>=0?'+':'')+(freedom-preFreed).toFixed(3);
+    if(el('bThreat'))el('bThreat').textContent=threat.toFixed(3);
+    if(el('bCoilPos'))el('bCoilPos').textContent='C'+spiralCoil(spiralPos)+':'+spiralPos;
+    if(el('bCortexRes'))el('bCortexRes').textContent=cortexRes.conf.toFixed(3);
+  }
+
+  if(captured){
+    if(color==='w')state.wCaptured.push(captured.type);else state.bCaptured.push(captured.type);
+    var cn={K:'KING',Q:'QUEEN',R:'ROOK',B:'BISHOP',N:'KNIGHT',P:'PAWN'};
+    log(color.toUpperCase()+' CAPTURES '+cn[captured.type]+' +'+PIECE_VALUE[captured.type],color==='w'?'w-event':'b-event');
+    if(captured.type==='K'){
+      log(color.toUpperCase()+' CAPTURES THE KING','important check');
+      state.gameOver=true;if(color==='w')wWins++;else bWins++;handleWin(color);return;
+    }
+  }
+
+  // Check detection
+  if(isInCheck(state.board,opp)){
+    if(color==='w')state.wChecks++;else state.bChecks++;
+    log(color.toUpperCase()+' CHECKS '+opp.toUpperCase()+' [W:'+state.wChecks+' B:'+state.bChecks+']','check');
+    sack.reinforceCheck();
+    if(state.wChecks>=CHECK_WIN||state.bChecks>=CHECK_WIN){
+      var winner=state.wChecks>=CHECK_WIN?'w':'b';
+      log('★ '+(winner==='w'?'WHITE':'BLACK')+' WINS BY CHECK DOMINATION!','win');
+      state.gameOver=true;if(winner==='w')wWins++;else bWins++;
+      renderBoard();renderSpiralCortex('cortexW',sackW,true);renderSpiralCortex('cortexB',sackB,false);
+      renderNeuronBars('wNeuronBars',sackW,true);renderNeuronBars('bNeuronBars',sackB,false);
+      updateUI();handleWin(winner);return;
+    }
+  }
+
+  state.moveCount++;state.turn=opp;
+  if(state.moveCount>600){
+    log('DRAW — MAX MOVES','important');state.gameOver=true;
+    sackW.reinforceOutcome(0);sackB.reinforceOutcome(0);
+    if(autoRunActive){var gr2=generations-autoRunStartGen;updateAutoRunProgress();if(gr2>=autoRunTarget){autoRunActive=false;clearInterval(intervalId);running=false;}else{endGeneration();}}
+    return;
+  }
+
+  renderBoard();
+  renderSpiralCortex('cortexW',sackW,true);
+  renderSpiralCortex('cortexB',sackB,false);
+  renderNeuronBars('wNeuronBars',sackW,true);
+  renderNeuronBars('bNeuronBars',sackB,false);
+  updateUI();
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async function() {
+  var wnData = await sto_get(SK_WN);
+  var bnData = await sto_get(SK_BN);
+  var meta   = await sto_get(SK_META);
+  if(wnData) sackW.deserialise(wnData);
+  if(bnData) sackB.deserialise(bnData);
+  if(meta){generations=meta.generations||0;wWins=meta.wWins||0;bWins=meta.bWins||0;}
+  if(wnData||bnData) log('✦ PERSISTENT CORTEX LOADED — W:'+sackW.totalChains+' B:'+sackB.totalChains+' chains','chain');
+
+  function getMs(){return Math.max(40,Math.round(800/(parseInt(el('speed')?el('speed').value:'5')||5)));}
+
+  el('btnStart').addEventListener('click',function(){
+    if(running)return;running=true;this.disabled=true;el('btnPause').disabled=false;
+    if(intervalId)clearInterval(intervalId);
+    intervalId=setInterval(doTick,getMs());
+    log('▶ SACK CHESS v4 STARTED','important');
+  });
+  el('btnPause').addEventListener('click',function(){
+    if(!running)return;running=false;clearInterval(intervalId);
+    el('btnStart').disabled=false;this.disabled=true;log('‖ PAUSED','');
+  });
+  el('btnReset').addEventListener('click',function(){
+    clearInterval(intervalId);running=false;
+    sackW.resetChain();sackB.resetChain();
+    state=freshState();
+    el('btnStart').disabled=false;el('btnPause').disabled=true;
+    el('gameLog').innerHTML='';
+    renderBoard();renderSpiralCortex('cortexW',sackW,true);renderSpiralCortex('cortexB',sackB,false);
+    renderNeuronBars('wNeuronBars',sackW,true);renderNeuronBars('bNeuronBars',sackB,false);
+    updateUI();log('↺ RESET — CORTEX MEMORY RETAINED','important');
+  });
+  el('btnClearMem').addEventListener('click',async function(){
+    clearInterval(intervalId);running=false;
+    generations=0;wWins=0;bWins=0;
+    sackW=new SACK('White');sackB=new SACK('Black');
+    await sto_del(SK_WN);await sto_del(SK_BN);await sto_del(SK_META);
+    state=freshState();
+    el('btnStart').disabled=false;el('btnPause').disabled=true;
+    el('gameLog').innerHTML='';
+    renderBoard();renderSpiralCortex('cortexW',sackW,true);renderSpiralCortex('cortexB',sackB,false);
+    renderNeuronBars('wNeuronBars',sackW,true);renderNeuronBars('bNeuronBars',sackB,false);
+    updateUI();log('✕ CORTEX WIPED — FRESH START','important');
+  });
+  el('speed').addEventListener('input',function(){
+    if(el('speedVal'))el('speedVal').textContent=this.value;
+    if(running){clearInterval(intervalId);intervalId=setInterval(doTick,getMs());}
+  });
+  el('winBtn').addEventListener('click',function(){
+    el('overlay').classList.remove('show');endGeneration();
+  });
+  el('arTarget').addEventListener('input',function(){
+    var tgt=parseInt(this.value)||700;
+    if(el('btnAutoRun')&&!autoRunActive)el('btnAutoRun').textContent='▶▶ RUN '+tgt;
+  });
+  el('btnAutoRun').addEventListener('click',function(){
+    if(autoRunActive){
+      autoRunActive=false;this.classList.remove('active');
+      this.textContent='▶▶ RUN '+(parseInt(el('arTarget').value)||700);
+      log('■ AUTO-RUN STOPPED AT GEN '+generations,'important');return;
+    }
+    autoRunTarget=parseInt(el('arTarget').value)||700;
+    autoRunStartGen=generations;autoRunActive=true;
+    this.classList.add('active');this.textContent='■ STOP (0)';
+    log('▶▶ AUTO-RUN — TARGET: '+autoRunTarget+' GAMES','win');
+    if(!running){
+      running=true;el('btnStart').disabled=true;el('btnPause').disabled=false;
+      if(intervalId)clearInterval(intervalId);
+      intervalId=setInterval(doTick,getMs());
+    }
+    updateAutoRunProgress();
+  });
+
+  renderBoard();
+  renderSpiralCortex('cortexW',sackW,true);
+  renderSpiralCortex('cortexB',sackB,false);
+  renderNeuronBars('wNeuronBars',sackW,true);
+  renderNeuronBars('bNeuronBars',sackB,false);
+  updateUI();
+  log('✦ SACK CHESS v4 — SPIRAL CORTEX INITIALISED','important');
+  log('  FIELD SIZE: '+FIELD_SIZE+' | COILS: '+SPIRAL_COILS+' | NEURONS: '+NEURON_COUNT,'');
+  log('  DIRECT BOARD ENCODING — NO PRESSURE FIELD — NO MEMORY SYNC','');
+  log('  5-MOVE THREAT FUNNEL LOOKAHEAD — INDEPENDENT CORTEX FIELDS','');
+  log('  PRESS START TO BEGIN','');
+});
+</script>
+</body>
+</html>
