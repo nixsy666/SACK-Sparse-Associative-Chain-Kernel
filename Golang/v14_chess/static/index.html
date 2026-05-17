@@ -136,6 +136,28 @@ header{width:100%;padding:12px 18px;display:flex;align-items:center;justify-cont
 .ar-progress-fill{height:100%;background:var(--gold);box-shadow:0 0 6px var(--gold);transition:width 0.3s ease;}
 .ar-progress-label{font-size:0.5rem;color:var(--gold);min-width:55px;text-align:right;}
 
+/* Mode / Stockfish bar */
+.mode-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;padding:6px 10px;border:1px solid var(--border);background:var(--panel);width:100%;margin-top:2px;}
+.mode-label{font-size:0.46rem;letter-spacing:0.2em;opacity:0.35;}
+.btn.sf{border-color:#a855f7;color:#a855f7;font-size:0.52rem;min-height:34px;padding:5px 12px;}
+.btn.sf.active{background:rgba(168,85,247,0.1);box-shadow:0 0 10px rgba(168,85,247,0.3);}
+.sf-side-toggle{font-size:0.5rem;letter-spacing:0.12em;padding:4px 10px;min-height:34px;border-color:#a855f7;color:#a855f7;}
+.sf-side-toggle.playing-w{border-color:var(--wf)!important;color:var(--wf)!important;}
+.sf-side-toggle.playing-b{border-color:var(--bf)!important;color:var(--bf)!important;}
+
+/* Eval bar */
+.eval-wrap{width:100%;padding:0 14px;margin-top:4px;}
+.eval-bar-outer{position:relative;height:14px;background:var(--neutral);overflow:hidden;border:1px solid var(--border);}
+.eval-white{position:absolute;top:0;left:0;height:100%;background:var(--wf);opacity:0.75;transition:width 0.5s ease;}
+.eval-black{position:absolute;top:0;right:0;height:100%;background:var(--bf);opacity:0.75;transition:width 0.5s ease;}
+.eval-centre{position:absolute;top:0;left:50%;width:1px;height:100%;background:rgba(255,255,255,0.15);}
+.eval-labels{display:flex;justify-content:space-between;font-size:0.42rem;letter-spacing:0.1em;margin-top:2px;opacity:0.45;}
+.eval-score{text-align:center;font-size:0.48rem;letter-spacing:0.1em;margin-top:1px;color:var(--textbright);}
+
+/* Stockfish log entry */
+.log-entry.sf-event{color:#a855f7;}
+.log-entry.sf-event::before{content:'⚡ ';}
+
 /* Delegator piece-child panel */
 .piece-child-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:5px;}
 .pc-cell{padding:4px 2px;text-align:center;border:1px solid var(--border);background:var(--neutral);position:relative;transition:border-color 0.3s,background 0.3s;}
@@ -302,6 +324,22 @@ header{width:100%;padding:12px 18px;display:flex;align-items:center;justify-cont
         <span class="ar-progress-label" id="arProgressLabel">—</span>
       </div>
     </div>
+    <!-- MODE / STOCKFISH BAR -->
+    <div class="mode-bar">
+      <div class="mode-label">ENGINE</div>
+      <button class="btn sf" id="btnMode">⚙ SELF-PLAY</button>
+      <button class="btn sf sf-side-toggle" id="btnSFSide" style="display:none">SF PLAYS: B</button>
+      <div class="mode-label" id="sfStatusLabel" style="display:none;color:#a855f7;opacity:1;letter-spacing:0.1em">STOCKFISH ACTIVE</div>
+    </div>
+    <!-- EVAL BAR (shown only in vs_stockfish mode) -->
+    <div class="eval-wrap" id="evalWrap" style="display:none">
+      <div class="eval-bar-outer">
+        <div class="eval-white" id="evalWhite" style="width:50%"></div>
+        <div class="eval-black" id="evalBlack" style="width:50%"></div>
+        <div class="eval-centre"></div>
+      </div>
+      <div class="eval-labels"><span style="color:var(--wf)">WHITE</span><span id="evalScore" class="eval-score">+0.00</span><span style="color:var(--bf)">BLACK</span></div>
+    </div>
     <div style="width:100%">
       <div style="font-size:0.46rem;letter-spacing:0.14em;opacity:0.35;margin-bottom:3px">GAME LOG</div>
       <div class="logbox" id="gameLog"></div>
@@ -381,7 +419,7 @@ var SPIRAL_MAP = (function(){
 var FIELD_SIZE = SPIRAL_MAP.total;
 var NEURON_COUNT = 64;
 
-var CHECK_WIN = 100;
+var CHECK_WIN = 25;
 var API = '';  // same origin
 
 var PIECES = {wK:'\u2654',wQ:'\u2655',wR:'\u2656',wB:'\u2657',wN:'\u2658',wP:'\u2659',
@@ -400,7 +438,12 @@ var uiState = {
   wLastMove: null, bLastMove: null,
   sackW: null, sackB: null,
   delegW: null, delegB: null,
-  gameOver: false
+  gameOver: false,
+  // Stockfish / mode
+  mode: 'self_play',
+  sfSide: 'b',
+  sfEval: 0,
+  sfWinChance: 50
 };
 
 function delegTotalChains(d) {
@@ -471,6 +514,10 @@ function applyTickResult(d) {
   uiState.delegW      = d.delegW;
   uiState.delegB      = d.delegB;
   uiState.gameOver    = d.gameOver;
+  if (d.mode)        uiState.mode        = d.mode;
+  if (d.sfSide)      uiState.sfSide      = d.sfSide;
+  if (d.sfEval      !== undefined) uiState.sfEval      = d.sfEval;
+  if (d.sfWinChance !== undefined) uiState.sfWinChance = d.sfWinChance;
   if (d.move) {
     if (d.color === 'w') uiState.wLastMove = d.move;
     else uiState.bLastMove = d.move;
@@ -511,6 +558,8 @@ function applyTickResult(d) {
   renderSubSacks('bSubSackGrid','bSsBar','bSsSummary', d.sackB);
   renderDelegator('wPieceGrid','wActivePiece','wRoutes','wSTombCount','wSTombBar','wComboRes', d.delegW||uiState.delegW, true);
   renderDelegator('bPieceGrid','bActivePiece','bRoutes','bSTombCount','bSTombBar','bComboRes', d.delegB||uiState.delegB, false);
+  renderModeBar();
+  renderEvalBar();
   updateUI();
 
   if (d.gameOver && d.winner) {
@@ -850,6 +899,47 @@ function renderSubSacks(gridId, barId, summaryId, sackStats) {
 }
 
 // ============================================================================
+// MODE BAR + EVAL BAR RENDERERS
+// ============================================================================
+function renderModeBar() {
+  var vsMode = uiState.mode === 'vs_stockfish';
+  var btnMode   = el('btnMode');
+  var btnSFSide = el('btnSFSide');
+  var sfStatus  = el('sfStatusLabel');
+  var evalWrap  = el('evalWrap');
+
+  if (btnMode) {
+    btnMode.textContent = vsMode ? '⚡ VS STOCKFISH' : '⚙ SELF-PLAY';
+    btnMode.classList.toggle('active', vsMode);
+  }
+  if (btnSFSide) {
+    btnSFSide.style.display = vsMode ? '' : 'none';
+    btnSFSide.textContent   = 'SF PLAYS: ' + (uiState.sfSide === 'w' ? 'W' : 'B');
+    btnSFSide.className = 'btn sf sf-side-toggle' +
+      (uiState.sfSide === 'w' ? ' playing-w' : ' playing-b');
+  }
+  if (sfStatus) sfStatus.style.display = vsMode ? '' : 'none';
+  if (evalWrap) evalWrap.style.display  = vsMode ? '' : 'none';
+}
+
+function renderEvalBar() {
+  if (uiState.mode !== 'vs_stockfish') return;
+  // winChance is 0-100 where 50=equal, >50=white winning
+  var wc = uiState.sfWinChance;
+  if (wc === undefined || wc === null) wc = 50;
+  wc = Math.max(0, Math.min(100, wc));
+  var whitePct = wc.toFixed(1);
+  var blackPct = (100 - wc).toFixed(1);
+  if (el('evalWhite')) el('evalWhite').style.width = whitePct + '%';
+  if (el('evalBlack')) el('evalBlack').style.width = blackPct + '%';
+
+  // Score label — show eval in pawns with sign
+  var evalPawns = uiState.sfEval || 0;
+  var label = (evalPawns >= 0 ? '+' : '') + evalPawns.toFixed(2);
+  if (el('evalScore')) el('evalScore').textContent = label;
+}
+
+// ============================================================================
 // DELEGATOR RENDERER
 // Renders the 6-cell piece child grid + shared tomb bar + combo resonance
 // ============================================================================
@@ -876,7 +966,7 @@ function renderDelegator(gridId, activeId, routesId, stombCountId, stombBarId, c
     var child  = children[i] || {};
     var pType  = PIECE_TYPES[i];
     var chains = child.totalChains || child.TotalChains || 0;
-    var spawned = chains > 0 || (child.spawnCount||child.SpawnCount||0) > 0;
+    var spawned = chains > 0 || (child.routeCount||child.RouteCount||0) > 0;
 
     var cell = document.createElement('div');
     cell.className = 'pc-cell' + (spawned ? ' alive' : '') + (i === activeIdx ? ' active' : '');
@@ -885,13 +975,14 @@ function renderDelegator(gridId, activeId, routesId, stombCountId, stombBarId, c
     ts.className = 'pc-type';
     ts.textContent = syms[pType] || pType;
 
+    var routes = child.routeCount || child.RouteCount || 0;
     var cs = document.createElement('span');
     cs.className = 'pc-chains';
-    cs.textContent = chains > 0 ? chains : '—';
+    cs.textContent = chains > 0 ? chains : (routes > 0 ? '·' + routes : '—');
 
     cell.appendChild(ts);
     cell.appendChild(cs);
-    cell.title = pType + ': ' + chains + ' chains';
+    cell.title = pType + ': ' + chains + ' chains, ' + routes + ' routes';
     grid.appendChild(cell);
   }
 
@@ -943,6 +1034,10 @@ document.addEventListener('DOMContentLoaded', function() {
     uiState.sackB = d.sackB;
     uiState.delegW = d.delegW;
     uiState.delegB = d.delegB;
+    if (d.mode)        uiState.mode        = d.mode;
+    if (d.sfSide)      uiState.sfSide      = d.sfSide;
+    if (d.sfEval      !== undefined) uiState.sfEval      = d.sfEval;
+    if (d.sfWinChance !== undefined) uiState.sfWinChance = d.sfWinChance;
     renderBoard();
     renderSpiralCortex('cortexW', d.sackW, true);
     renderSpiralCortex('cortexB', d.sackB, false);
@@ -952,13 +1047,15 @@ document.addEventListener('DOMContentLoaded', function() {
     renderSubSacks('bSubSackGrid','bSsBar','bSsSummary', d.sackB);
     renderDelegator('wPieceGrid','wActivePiece','wRoutes','wSTombCount','wSTombBar','wComboRes', d.delegW, true);
     renderDelegator('bPieceGrid','bActivePiece','bRoutes','bSTombCount','bSTombBar','bComboRes', d.delegB, false);
+    renderModeBar();
+    renderEvalBar();
     updateUI();
     var wLoad = delegTotalChains(d.delegW) || (d.sackW?d.sackW.totalChains:0);
     var bLoad = delegTotalChains(d.delegB) || (d.sackB?d.sackB.totalChains:0);
     if (wLoad > 0 || bLoad > 0) {
       log('✦ PERSISTENT CORTEX LOADED — W:'+wLoad+' B:'+bLoad+' chains','chain');
     }
-    log('✦ SACK CHESS v13 — DELEGATOR+PIECE CHILDREN CONNECTED','important');
+    log('✦ SACK CHESS v13 — DELEGATOR+PIECE CHILDREN+STOCKFISH CONNECTED','important');
     log('  FIELD SIZE: '+FIELD_SIZE+' | COILS: '+SPIRAL_COILS+' | NEURONS: '+NEURON_COUNT,'');
     log('  PRESS START TO BEGIN','');
   });
@@ -1019,6 +1116,33 @@ document.addEventListener('DOMContentLoaded', function() {
   el('speed').addEventListener('input',function(){
     if(el('speedVal'))el('speedVal').textContent=this.value;
     if(running){clearInterval(intervalId);intervalId=setInterval(doTick,getMs());}
+  });
+
+  // Mode toggle — cycles between self_play and vs_stockfish
+  el('btnMode').addEventListener('click', function() {
+    var newMode = uiState.mode === 'self_play' ? 'vs_stockfish' : 'self_play';
+    fetch(API+'/mode', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mode: newMode, sfSide: uiState.sfSide})
+    }).then(function(r){return r.json();}).then(function(d){
+      uiState.mode   = d.mode;
+      uiState.sfSide = d.sfSide;
+      renderModeBar();
+      renderEvalBar();
+      log('⚙ MODE → ' + d.mode.toUpperCase().replace('_',' ') +
+        (d.mode==='vs_stockfish' ? ' (Stockfish plays: '+d.sfSide.toUpperCase()+')' : ''), 'important');
+    }).catch(function(e){log('MODE ERROR: '+e.message,'important');});
+  });
+
+  // SF side toggle — switches which colour Stockfish plays
+  el('btnSFSide').addEventListener('click', function() {
+    var newSide = uiState.sfSide === 'b' ? 'w' : 'b';
+    fetch(API+'/mode', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mode: 'vs_stockfish', sfSide: newSide})
+    }).then(function(r){return r.json();}).then(function(d){
+      uiState.sfSide = d.sfSide;
+      renderModeBar();
+      log('⚙ STOCKFISH NOW PLAYS: ' + d.sfSide.toUpperCase(), 'important');
+    }).catch(function(e){log('SIDE ERROR: '+e.message,'important');});
   });
   el('winBtn').addEventListener('click',function(){
     el('overlay').classList.remove('show');

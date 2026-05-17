@@ -91,6 +91,12 @@ type Server struct {
 	autoTarget  int
 	autoStart   int
 	saveFile    string
+
+	// Chess-API / Stockfish integration
+	mode         string  // "self_play" | "vs_stockfish"
+	sfSide       string  // which colour Stockfish plays ("w" or "b")
+	lastSFEval   float64 // last Stockfish centipawn eval (÷100)
+	lastWinChance float64 // last Stockfish win-chance for white (0–100)
 }
 
 // ============================================================================
@@ -134,6 +140,12 @@ func scoreMove(board Board, color string, move Move, delegator *DelegatorSack, v
 	if pieceIdx >= 0 {
 		sharedConf := delegator.sharedTombConf(pieceIdx, snapAfter)
 		score += sharedConf * 2.5
+		// Exploration bonus: piece types that have never been routed get a nudge
+		// so the King cannot monopolise all move selections early in training.
+		// Decays to zero once the child has made at least one real move.
+		if delegator.ChildRouteCounts[pieceIdx] == 0 {
+			score += 4.0
+		}
 	}
 	if child != nil {
 		childConf := child.LastPulse.RecognitionConf
@@ -341,6 +353,15 @@ type TickResult struct {
 	WDelta     float64 `json:"wDelta"`
 	BDelta     float64 `json:"bDelta"`
 	Log        []LogEntry `json:"log"`
+
+	// Stockfish / chess-api fields
+	Mode        string  `json:"mode"`
+	SFSide      string  `json:"sfSide"`
+	IsStockfish bool    `json:"isStockfish"`  // was this tick a Stockfish move?
+	SFMove      string  `json:"sfMove"`       // UCI string of Stockfish's move
+	SFSAN       string  `json:"sfSan"`        // short algebraic of Stockfish's move
+	SFEval      float64 `json:"sfEval"`       // last SF eval (+ = white winning)
+	SFWinChance float64 `json:"sfWinChance"`  // last SF win-chance for white 0-100
 }
 
 type PieceJSON struct {
@@ -356,7 +377,7 @@ type LogEntry struct {
 // ============================================================================
 // TICK LOGIC
 // ============================================================================
-func (srv *Server) doTick() TickResult {
+func (srv *Server) doTick(sfPreFetch *ChessAPIResponse, sfPreFetchFEN string) TickResult {
 	gs := srv.state
 	var logs []LogEntry
 	addLog := func(msg, cls string) {
@@ -424,53 +445,130 @@ func (srv *Server) doTick() TickResult {
 
 	snapBefore := pressureSnapshot(gs.Board, color)
 
+	// -----------------------------------------------------------------------
+	// MOVE SELECTION — Stockfish or SACK
+	// -----------------------------------------------------------------------
 	var chosenMove Move
-	if isFirst {
-		chosenMove = allMoves[rand.Intn(min(18, len(allMoves)))]
-		if color == "w" {
-			gs.FirstMoveW = false
+	isStockfishTurn := srv.mode == "vs_stockfish" && color == srv.sfSide
+	promotionPiece  := ""
+	var sfApiResp   *ChessAPIResponse
+
+	if isStockfishTurn {
+		// Use the result pre-fetched outside the lock.
+		// Verify the FEN still matches — a RESET between prefetch and re-acquire
+		// would change the board, in which case we skip and fall back to SACK.
+		currentFEN := boardToFEN(gs.Board, color, gs.MoveCount)
+		resp := sfPreFetch
+		if sfPreFetchFEN != currentFEN {
+			resp = nil // state changed — stale prefetch, use SACK
+		}
+		sfOk := false
+		if resp != nil && resp.Move != "" {
+			sfMove, promo, parseOk := uciToMove(resp.Move)
+			if parseOk {
+				// Validate against SACK's legal-move list.
+				// Castling / en passant moves will fail here and fall back gracefully.
+				for _, m := range allMoves {
+					if m.From == sfMove.From && m.To == sfMove.To {
+						chosenMove    = sfMove
+						promotionPiece = promo
+						sfApiResp     = resp
+						sfOk          = true
+						srv.lastSFEval    = resp.Eval
+						srv.lastWinChance = resp.WinChance
+						label := resp.SAN
+						if label == "" {
+							label = resp.Move
+						}
+						addLog(fmt.Sprintf("♟ STOCKFISH: %s  [eval:%.2f  wc:%.1f%%]",
+							label, resp.Eval, resp.WinChance), "sf-event")
+						break
+					}
+				}
+			}
+		}
+		if !sfOk {
+			if resp == nil {
+				addLog("⚠ STOCKFISH UNAVAILABLE — SACK FALLBACK", "important")
+			} else {
+				addLog("⚠ STOCKFISH MOVE INVALID ("+resp.Move+") — SACK FALLBACK", "important")
+			}
+			isStockfishTurn = false // fall through to SACK selection
+		}
+	}
+
+	if !isStockfishTurn {
+		if isFirst {
+			chosenMove = allMoves[rand.Intn(min(18, len(allMoves)))]
+			if color == "w" {
+				gs.FirstMoveW = false
+			} else {
+				gs.FirstMoveB = false
+			}
+			addLog(color+" OPENING RANDOM", color+"-event")
 		} else {
-			gs.FirstMoveB = false
-		}
-		addLog(color+" OPENING RANDOM", color+"-event")
-	} else {
-		visited := gs.WVisited
-		if color == "b" {
-			visited = gs.BVisited
-		}
-		best := math.Inf(-1)
-		for _, m := range allMoves {
-			base := scoreMove(gs.Board, color, m, sack, visited)
-			la   := lookaheadScore(gs.Board, color, m, sack)
-			total := base*0.4 + la*0.6
-			if total > best {
-				best = total
-				chosenMove = m
+			visited := gs.WVisited
+			if color == "b" {
+				visited = gs.BVisited
+			}
+			best := math.Inf(-1)
+			for _, m := range allMoves {
+				base := scoreMove(gs.Board, color, m, sack, visited)
+				la   := lookaheadScore(gs.Board, color, m, sack)
+				total := base*0.4 + la*0.6
+				if total > best {
+					best = total
+					chosenMove = m
+				}
 			}
 		}
 	}
 
-	// Route to piece child BEFORE executing the move — piece is still at From square.
-	// routeMove reads board[move.From] to identify the piece type, so it must be
-	// called while the board still holds the pre-move position.
-	activeChild, _ := sack.routeMove(gs.Board, chosenMove)
+	// -----------------------------------------------------------------------
+	// EXECUTE MOVE
+	// Route to piece child BEFORE applying the move — piece is still on From.
+	// Skip for Stockfish turns (that colour's SACK doesn't learn SF's choices).
+	// -----------------------------------------------------------------------
+	var activeChild *SACKEngine
+	if !isStockfishTurn {
+		activeChild, _ = sack.routeMove(gs.Board, chosenMove)
+	}
 
-	// Execute move
 	captured := gs.Board[chosenMove.To[0]][chosenMove.To[1]]
 	gs.Board = applyMove(gs.Board, chosenMove)
 
-	// SACK chain link — piece-type child handles this position's chain.
-	// Spiral position is derived from king-centric pressure delta (consistent
-	// with the field topology). The child itself learns piece-level patterns.
+	// Apply promotion piece type (Stockfish or pawn-reaching-back-rank)
+	if promotionPiece != "" {
+		promoMap := map[string]string{"q":"Q","r":"R","b":"B","n":"N"}
+		if pt, ok := promoMap[promotionPiece]; ok {
+			if p := gs.Board[chosenMove.To[0]][chosenMove.To[1]]; p != nil {
+				p.Type = pt
+			}
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// SACK LEARNING — only when SACK made the move
+	// -----------------------------------------------------------------------
 	snapAfter := pressureSnapshot(gs.Board, color)
 	spiralPos := deltaToSpiralPos(snapBefore, snapAfter)
-	nid, conf := activeChild.queryField(spiralPos)
-	activeChild.LastConf = conf
-	sack.LastConf = conf
-	sack.addLink(nid, spiralPos, snapBefore, snapAfter)
-	// Full pulse on the shared tomb — updates SharedPulse and promotes eligible
-	// chains. Done after addLink so ComboResonance is already current.
-	sack.pulseSharedTomb(sack.ActiveIdx, snapAfter)
+	var conf float64
+	if !isStockfishTurn && activeChild != nil {
+		var nid int
+		nid, conf = activeChild.queryField(spiralPos)
+		activeChild.LastConf = conf
+		sack.LastConf = conf
+		sack.addLink(nid, spiralPos, snapBefore, snapAfter)
+	}
+	// Pulse shared tomb regardless — SACK observes Stockfish's resulting
+	// board state so it builds up pressure context for future turns.
+	sfIdx := sack.ActiveIdx
+	if isStockfishTurn {
+		sfIdx = -1
+	}
+	sack.pulseSharedTomb(sfIdx, snapAfter)
+
+	_ = sfApiResp // used below for result fields
 
 	// Freedom
 	freedom := kingFreedom(gs.Board, color)
@@ -500,7 +598,7 @@ func (srv *Server) doTick() TickResult {
 	ms := files[chosenMove.From[1]] + fmt.Sprintf("%d", 8-chosenMove.From[0]) +
 		"→" + files[chosenMove.To[1]] + fmt.Sprintf("%d", 8-chosenMove.To[0])
 
-	// Coil pos string
+	// Coil pos string (spiralPos declared in the learning block above)
 	coilPosStr := fmt.Sprintf("C%d:%d", spiralCoil(spiralPos), spiralPos)
 
 	if color == "w" {
@@ -624,6 +722,17 @@ func (srv *Server) doTick() TickResult {
 	result.DelegB = srv.sackB.stats()
 	result.Log = logs
 
+	// Stockfish fields — always carry last known eval so UI bar stays visible
+	result.Mode        = srv.mode
+	result.SFSide      = srv.sfSide
+	result.IsStockfish = isStockfishTurn
+	result.SFEval      = srv.lastSFEval
+	result.SFWinChance = srv.lastWinChance
+	if sfApiResp != nil {
+		result.SFMove = sfApiResp.Move
+		result.SFSAN  = sfApiResp.SAN
+	}
+
 	return result
 }
 
@@ -726,7 +835,6 @@ func (srv *Server) tryLoad() {
 		srv.generations)
 	srv.loadTombs()
 	srv.reportTombStatus()
-	log.Printf("loaded")
 }
 
 func min(a, b int) int {
@@ -751,8 +859,30 @@ func (srv *Server) handleTick(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		return
 	}
+
+	// --- Pre-fetch Stockfish move OUTSIDE the lock ----------------------------
+	// The API call can take up to ChessAPITimeout. Holding the mutex that long
+	// would block every other handler (reset, status, etc.) for the full wait.
+	// Instead we: read the minimal state needed → release lock → call API →
+	// re-acquire lock → run doTick with the pre-fetched result.
+	// Since the client sets pendingTick=true while waiting, no concurrent tick
+	// can alter game state between our read and re-acquire.
+	var sfPreFetch *ChessAPIResponse
+	var sfPreFetchFEN string
+
 	srv.mu.Lock()
-	result := srv.doTick()
+	if srv.mode == "vs_stockfish" && !srv.state.GameOver && srv.state.Turn == srv.sfSide {
+		sfPreFetchFEN = boardToFEN(srv.state.Board, srv.state.Turn, srv.state.MoveCount)
+	}
+	srv.mu.Unlock()
+
+	if sfPreFetchFEN != "" {
+		sfPreFetch, _ = queryChessAPI(sfPreFetchFEN)
+		// error is handled inside doTick — nil sfPreFetch triggers SACK fallback
+	}
+
+	srv.mu.Lock()
+	result := srv.doTick(sfPreFetch, sfPreFetchFEN)
 	srv.mu.Unlock()
 	json.NewEncoder(w).Encode(result)
 }
@@ -789,7 +919,6 @@ func (srv *Server) handleSave(w http.ResponseWriter, r *http.Request) {
 	srv.maybeSave()
 	srv.mu.Unlock()
 	w.Write([]byte(`{"ok":true}`))
-	log.Printf("Save filed")
 }
 
 type StatusResult struct {
@@ -811,6 +940,11 @@ type StatusResult struct {
 	BFreedom    float64   `json:"bFreedom"`
 	WCaptured   []string  `json:"wCaptured"`
 	BCaptured   []string  `json:"bCaptured"`
+	// Stockfish / mode
+	Mode        string  `json:"mode"`
+	SFSide      string  `json:"sfSide"`
+	SFEval      float64 `json:"sfEval"`
+	SFWinChance float64 `json:"sfWinChance"`
 }
 
 func (srv *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -844,9 +978,65 @@ func (srv *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		BFreedom:    gs.BFreedom,
 		WCaptured:   gs.WCaptured,
 		BCaptured:   gs.BCaptured,
+		Mode:        srv.mode,
+		SFSide:      srv.sfSide,
+		SFEval:      srv.lastSFEval,
+		SFWinChance: srv.lastWinChance,
 	}
 	srv.mu.Unlock()
 	json.NewEncoder(w).Encode(result)
+}
+
+// handleMode — GET returns current mode; POST sets mode + sfSide.
+//
+//	GET  /mode
+//	POST /mode  body: {"mode":"vs_stockfish","sfSide":"b"}
+//	            mode values: "self_play" | "vs_stockfish"
+//	            sfSide values: "w" | "b"  (which colour Stockfish plays)
+func (srv *Server) handleMode(w http.ResponseWriter, r *http.Request) {
+	cors(w)
+	if r.Method == "OPTIONS" {
+		return
+	}
+	if r.Method == "GET" {
+		srv.mu.Lock()
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"mode":        srv.mode,
+			"sfSide":      srv.sfSide,
+			"sfEval":      srv.lastSFEval,
+			"sfWinChance": srv.lastWinChance,
+		})
+		srv.mu.Unlock()
+		return
+	}
+	// POST
+	var req struct {
+		Mode   string `json:"mode"`
+		SFSide string `json:"sfSide"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Mode == "" {
+		http.Error(w, `{"error":"bad request — expected {mode, sfSide}"}`, 400)
+		return
+	}
+	if req.Mode != "self_play" && req.Mode != "vs_stockfish" {
+		http.Error(w, `{"error":"unknown mode"}`, 400)
+		return
+	}
+	srv.mu.Lock()
+	srv.mode = req.Mode
+	if req.SFSide == "w" || req.SFSide == "b" {
+		srv.sfSide = req.SFSide
+	}
+	// Reset eval display on mode switch
+	srv.lastSFEval    = 0
+	srv.lastWinChance = 50
+	srv.mu.Unlock()
+	log.Printf("MODE → %s  (Stockfish plays: %s)\n", srv.mode, srv.sfSide)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":     true,
+		"mode":   srv.mode,
+		"sfSide": srv.sfSide,
+	})
 }
 
 // ============================================================================
@@ -865,10 +1055,13 @@ func main() {
 	}
 
 	srv := &Server{
-		state:    freshGameState(),
-		sackW:    newDelegatorSack("White"),
-		sackB:    newDelegatorSack("Black"),
-		saveFile: saveFile,
+		state:        freshGameState(),
+		sackW:        newDelegatorSack("White"),
+		sackB:        newDelegatorSack("Black"),
+		saveFile:     saveFile,
+		mode:         "self_play",
+		sfSide:       "b",   // default: Stockfish plays black, SACK plays white
+		lastWinChance: 50.0, // neutral starting eval
 	}
 	srv.tryLoad()
 
@@ -877,6 +1070,7 @@ func main() {
 	http.HandleFunc("/clear",  srv.handleClear)
 	http.HandleFunc("/save",   srv.handleSave)
 	http.HandleFunc("/status", srv.handleStatus)
+	http.HandleFunc("/mode",   srv.handleMode)
 
 	// Serve static files from ./static/
 	http.Handle("/", http.FileServer(http.Dir("./static")))

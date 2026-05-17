@@ -798,6 +798,7 @@ type SACKStats struct {
 	SpiralPos     int          `json:"spiralPos"`
 	Neurons       []NeuronData `json:"neurons"`
 	SubSackGrowth map[int]int  `json:"subSackGrowth"`
+	RouteCount    int          `json:"routeCount"` // how many moves routed to this child
 }
 
 func (s *SACKEngine) stats() SACKStats {
@@ -988,12 +989,15 @@ func pieceAngle(idx int) uint64 {
 
 type DelegatorSack struct {
 	Name      string
-	// One child per piece type; nil until that type first moves.
+	// One child per piece type; pre-spawned at creation, never nil.
 	Children  [6]*SACKEngine
 	// Index of the child that handled the most recent actual move (-1 = none yet).
 	ActiveIdx int
 	SpawnCount  int
 	TotalRoutes int
+	// Per-child route counter — how many actual moves each piece type has made.
+	// Used for exploration bonus in scoring (unexplored piece types get a bump).
+	ChildRouteCounts [6]int
 	// Aggregate resonance across all active children.
 	// Updated after every move — this is the combined position fingerprint.
 	ComboResonance uint64
@@ -1013,11 +1017,19 @@ type DelegatorSack struct {
 }
 
 func newDelegatorSack(name string) *DelegatorSack {
-	return &DelegatorSack{
+	d := &DelegatorSack{
 		Name:       name,
 		ActiveIdx:  -1,
 		SharedTomb: newTomb(),
 	}
+	// Pre-spawn all 6 piece-type children so they are always present.
+	// Without eager spawn the King monopoly prevents other children from ever
+	// being routed to — the children show as dead in the UI and never learn.
+	for i, pType := range pieceChildOrder {
+		d.Children[i] = newSACK(fmt.Sprintf("%s-%s", d.Name, pType))
+	}
+	d.SpawnCount = 6
+	return d
 }
 
 // childFor returns the child for the given piece type, spawning it on first use.
@@ -1044,6 +1056,7 @@ func (d *DelegatorSack) routeMove(board Board, move Move) (*SACKEngine, int) {
 	child, idx := d.childFor(pType)
 	d.ActiveIdx = idx
 	d.TotalRoutes++
+	d.ChildRouteCounts[idx]++
 	d.syncFromChild(child)
 	return child, idx
 }
@@ -1247,7 +1260,9 @@ func (d *DelegatorSack) stats() DelegatorStats {
 	children := make([]SACKStats, 6)
 	for i, c := range d.Children {
 		if c != nil {
-			children[i] = c.stats()
+			s := c.stats()
+			s.RouteCount = d.ChildRouteCounts[i]
+			children[i] = s
 		}
 	}
 	var sharedTombStats TombStats
