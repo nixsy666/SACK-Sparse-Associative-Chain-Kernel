@@ -41,6 +41,48 @@ Board or world state is encoded not as a snapshot but as the **difference betwee
 
 ---
 
+## Easy Start
+
+Download and `cd` to the version you wish to try.
+
+### Requirements
+- Go 1.21+ — download from [go.dev/dl](https://go.dev/dl)
+- Windows / Linux / macOS
+- Stockfish binary (optional, for `vs_stockfish` mode — v13+)
+
+### Build and run
+
+```bash
+cd "sack geometric intelligence v13"
+go build -o sackchess.exe .
+./sackchess.exe
+```
+
+Then open your browser at **http://localhost:8080**
+
+### Stockfish setup (v14)
+
+v13 includes a `vs_stockfish` mode where SACK plays against a local Stockfish engine.
+
+1. Download the latest Windows release from:
+   👉 [github.com/official-stockfish/Stockfish/releases](https://github.com/official-stockfish/Stockfish/releases)
+
+2. The release will have a long filename like `stockfish-windows-x86-64-avx2.exe` — rename it to `stockfish.exe`, or leave it as-is. The engine finds any binary starting with `stockfish` in the same folder.
+
+3. Drop it alongside `sackchess.exe`:
+   ```
+   sack geometric intelligence v13/
+   ├── sackchess.exe
+   ├── stockfish.exe
+   └── ...
+   ```
+
+4. Select **vs_stockfish** in the UI. You should see `✓ Stockfish ready` in the console.
+
+**Tip:** Stockfish defaults to 100ms per move (very strong). Reduce `StockfishMoveTimeMs` in `chess_api.go` to `10` for easier early training — SACK needs occasional wins to build positive reinforcement chains.
+
+---
+
 ## The Possibility Chain
 
 SACK v2 introduces the **possibility chain** — a probabilistic lookahead that is architecturally distinct from brute force tree search.
@@ -70,6 +112,9 @@ First integration of SACK neuron chain layer with phasic chess field. Outcome-ba
 
 ### SACK Chess v4 (sack-chess2.html)
 Full delta geometry implementation with possibility chain lookahead. Board state encoded as pressure snapshot deltas rather than scalar power. Possibility chain sweeps 3 depths probabilistically. Experience chain uses proper geometric delta signals. The architecture that Copilot described as having *"AGI-adjacent properties."*
+
+### SACK Geometric Intelligence v13 (Go binary)
+The most complete implementation. Compiled Go engine with a six-child **DelegatorSack** architecture — one specialist cortex per piece type (K, Q, R, B, N, P), each building independent associative field memory, sharing context through a common tomb field. Features elastic lookahead depth, a continuous gravitational threat field replacing move-list blindness, phase-weighted king safety that decays naturally into endgame king activation, and a local Stockfish UCI subprocess for high-quality opponent training. Real-time visualisation at `localhost:8080` shows chains, routes, confidence, and positional evaluation per piece type.
 
 ---
 
