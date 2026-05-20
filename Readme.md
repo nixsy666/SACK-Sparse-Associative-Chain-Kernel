@@ -185,3 +185,5 @@ Neither party could have produced this alone in this form. That is the honest ac
 *"Intelligence is geometry. The field is the memory. The chain is the thought."*
 
 **Nicholas (Nixsy) & Claude — 2026**
+
+![an image of the working flowmap from functionality](https://github.com/nixsy666/SACK-Sparse-Associative-Chain-Kernel/blob/main/flow_Diagram.drawio.png?raw=true "Flow image from draw.io")
