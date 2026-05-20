@@ -32,25 +32,17 @@ func initialBoard() Board {
 	return b
 }
 
-func applyMoveInPlace(b *Board, m Move) (capturedPiece *Piece, promoted bool) {
-    capturedPiece = b[m.To[0]][m.To[1]]
-    b[m.To[0]][m.To[1]] = b[m.From[0]][m.From[1]]
-    b[m.From[0]][m.From[1]] = nil
-    p := b[m.To[0]][m.To[1]]
-    if p != nil && p.Type == "P" && (m.To[0] == 0 || m.To[0] == 7) {
-        b[m.To[0]][m.To[1]] = &Piece{p.Color, "Q"}
-        promoted = true
-    }
-    return
-}
+func applyMoveInPlace(b *Board, m Move) (captured *Piece, promoted bool) {
+	captured = b[m.To[0]][m.To[1]]
+	b[m.To[0]][m.To[1]] = b[m.From[0]][m.From[1]]
+	b[m.From[0]][m.From[1]] = nil
 
-func undoMoveInPlace(b *Board, m Move, capturedPiece *Piece, promoted bool) {
-    p := b[m.To[0]][m.To[1]]
-    if promoted {
-        p = &Piece{p.Color, "P"}
-    }
-    b[m.From[0]][m.From[1]] = p
-    b[m.To[0]][m.To[1]] = capturedPiece
+	p := b[m.To[0]][m.To[1]]
+	if p != nil && p.Type == "P" && (m.To[0] == 0 || m.To[0] == 7) {
+		b[m.To[0]][m.To[1]] = &Piece{p.Color, "Q"}
+		promoted = true
+	}
+	return
 }
 
 func cloneBoard(b Board) Board {
@@ -87,42 +79,45 @@ func getKingPos(b Board, color string) (int, int, bool) {
 }
 
 func isSquareAttacked(b Board, r, f int, byColor string) bool {
-	// To find a pawn of byColor that attacks (r,f), look in the direction
-	// OPPOSITE to that pawn's movement direction — i.e. "behind" (r,f)
-	// relative to byColor's advance.
-	// White pawns move toward row 0 (dir=-1), so a white pawn attacking
-	// (r,f) sits one row BELOW at r+1.  Black pawns move toward row 7
-	// (dir=+1), so a black pawn attacking (r,f) sits one row ABOVE at r-1.
-	pd := -1 // byColor="b": look at r-1
+	// Pawn attacks
+	pd := -1
 	if byColor == "w" {
-		pd = 1 // byColor="w": look at r+1
+		pd = 1
 	}
 	for _, df := range []int{-1, 1} {
 		pr, pf := r+pd, f+df
-		if inBounds(pr, pf) && b[pr][pf] != nil && b[pr][pf].Color == byColor && b[pr][pf].Type == "P" {
+		if inBounds(pr, pf) && b[pr][pf] != nil &&
+			b[pr][pf].Color == byColor && b[pr][pf].Type == "P" {
 			return true
 		}
 	}
-	knightMoves := [][2]int{{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}}
-	for _, nm := range knightMoves {
+
+	// Knights
+	for _, nm := range [][2]int{{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}} {
 		nr, nf := r+nm[0], f+nm[1]
-		if inBounds(nr, nf) && b[nr][nf] != nil && b[nr][nf].Color == byColor && b[nr][nf].Type == "N" {
+		if inBounds(nr, nf) && b[nr][nf] != nil &&
+			b[nr][nf].Color == byColor && b[nr][nf].Type == "N" {
 			return true
 		}
 	}
+
+	// King adjacency
 	for dr := -1; dr <= 1; dr++ {
 		for df := -1; df <= 1; df++ {
 			if dr == 0 && df == 0 {
 				continue
 			}
 			kr, kf := r+dr, f+df
-			if inBounds(kr, kf) && b[kr][kf] != nil && b[kr][kf].Color == byColor && b[kr][kf].Type == "K" {
+			if inBounds(kr, kf) && b[kr][kf] != nil &&
+				b[kr][kf].Color == byColor && b[kr][kf].Type == "K" {
 				return true
 			}
 		}
 	}
-	for _, dir := range [][2]int{{0, 1}, {0, -1}, {1, 0}, {-1, 0}} {
-		cr, cf := r+dir[0], f+dir[1]
+
+	// Rook/Queen (orthogonal)
+	for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		cr, cf := r+d[0], f+d[1]
 		for inBounds(cr, cf) {
 			p := b[cr][cf]
 			if p != nil {
@@ -131,12 +126,14 @@ func isSquareAttacked(b Board, r, f int, byColor string) bool {
 				}
 				break
 			}
-			cr += dir[0]
-			cf += dir[1]
+			cr += d[0]
+			cf += d[1]
 		}
 	}
-	for _, dir := range [][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}} {
-		cr, cf := r+dir[0], f+dir[1]
+
+	// Bishop/Queen (diagonal)
+	for _, d := range [][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}} {
+		cr, cf := r+d[0], f+d[1]
 		for inBounds(cr, cf) {
 			p := b[cr][cf]
 			if p != nil {
@@ -145,10 +142,11 @@ func isSquareAttacked(b Board, r, f int, byColor string) bool {
 				}
 				break
 			}
-			cr += dir[0]
-			cf += dir[1]
+			cr += d[0]
+			cf += d[1]
 		}
 	}
+
 	return false
 }
 
@@ -165,46 +163,34 @@ func getPieceMoves(b Board, r, f int, checkLegality bool) [][2]int {
 	if p == nil {
 		return nil
 	}
+
 	var moves [][2]int
 	oppColor := opp(p.Color)
 
-/* 	tryAdd := func(tr, tf int) {
+	tryAdd := func(tr, tf int) {
 		if !inBounds(tr, tf) {
 			return
 		}
 		if b[tr][tf] != nil && b[tr][tf].Color == p.Color {
 			return
 		}
-		if checkLegality {
-			nb := cloneBoard(b)
-			nb[tr][tf] = nb[r][f]
-			nb[r][f] = nil
-			if !isInCheck(nb, p.Color) {
-				moves = append(moves, [2]int{tr, tf})
-			}
-		} else {
+
+		if !checkLegality {
+			moves = append(moves, [2]int{tr, tf})
+			return
+		}
+
+		// simulate safely
+		nb := cloneBoard(b)
+		cap, promo := applyMoveInPlace(&nb, Move{[2]int{r, f}, [2]int{tr, tf}})
+		_ = cap
+		_ = promo
+
+		// king cannot move into check
+		if !isInCheck(nb, p.Color) {
 			moves = append(moves, [2]int{tr, tf})
 		}
-	} */
-
-    tryAdd := func(tr, tf int) {
-        if !inBounds(tr, tf) {
-            return
-        }
-        if b[r][f] != nil && b[tr][tf] != nil && b[tr][tf].Color == p.Color {
-            return
-        }
-        if checkLegality {
-            captured, promoted := applyMoveInPlace(&b, Move{[2]int{r, f}, [2]int{tr, tf}})
-            legal := !isInCheck(b, p.Color)
-            undoMoveInPlace(&b, Move{[2]int{r, f}, [2]int{tr, tf}}, captured, promoted)
-            if legal {
-                moves = append(moves, [2]int{tr, tf})
-            }
-        } else {
-            moves = append(moves, [2]int{tr, tf})
-        }
-    }
+	}
 
 	slide := func(dirs [][2]int) {
 		for _, d := range dirs {
@@ -233,25 +219,35 @@ func getPieceMoves(b Board, r, f int, checkLegality bool) [][2]int {
 		}
 		if inBounds(r+dir, f) && b[r+dir][f] == nil {
 			tryAdd(r+dir, f)
-			if r == start && b[r+dir][f] == nil && b[r+2*dir][f] == nil {
+			if r == start && b[r+2*dir][f] == nil {
 				tryAdd(r+2*dir, f)
 			}
 		}
 		for _, df := range []int{-1, 1} {
-			if inBounds(r+dir, f+df) && b[r+dir][f+df] != nil && b[r+dir][f+df].Color == oppColor {
+			if inBounds(r+dir, f+df) &&
+				b[r+dir][f+df] != nil &&
+				b[r+dir][f+df].Color == oppColor {
 				tryAdd(r+dir, f+df)
 			}
 		}
+
 	case "N":
 		for _, nm := range [][2]int{{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}} {
 			tryAdd(r+nm[0], f+nm[1])
 		}
+
 	case "B":
 		slide([][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}})
+
 	case "R":
-		slide([][2]int{{0, 1}, {0, -1}, {1, 0}, {-1, 0}})
+		slide([][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+
 	case "Q":
-		slide([][2]int{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}, {0, 1}, {0, -1}, {1, 0}, {-1, 0}})
+		slide([][2]int{
+			{1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+			{1, 0}, {-1, 0}, {0, 1}, {0, -1},
+		})
+
 	case "K":
 		for dr := -1; dr <= 1; dr++ {
 			for df := -1; df <= 1; df++ {
@@ -261,6 +257,7 @@ func getPieceMoves(b Board, r, f int, checkLegality bool) [][2]int {
 			}
 		}
 	}
+
 	return moves
 }
 
@@ -269,8 +266,7 @@ func getAllMoves(b Board, color string) []Move {
 	for r := 0; r < 8; r++ {
 		for f := 0; f < 8; f++ {
 			if b[r][f] != nil && b[r][f].Color == color {
-				pm := getPieceMoves(b, r, f, true)
-				for _, to := range pm {
+				for _, to := range getPieceMoves(b, r, f, true) {
 					moves = append(moves, Move{From: [2]int{r, f}, To: to})
 				}
 			}
@@ -285,14 +281,7 @@ func getAllMoves(b Board, color string) []Move {
 // resolve check before doing anything else, and cannot move pinned pieces
 // in ways that expose the King.
 func getLegalMoves(b Board, color string) []Move {
-	var legal []Move
-	for _, m := range getAllMoves(b, color) {
-		nb := applyMove(b, m)
-		if !isInCheck(nb, color) {
-			legal = append(legal, m)
-		}
-	}
-	return legal
+	return getAllMoves(b, color)
 }
 
 func boardPower(b Board, color string) float64 {

@@ -34,8 +34,8 @@ import (
 
 const (
 	//StockfishMoveTimeMs = 100  // ms per move — fast but still strong
-	StockfishMoveTimeMs = 10  // ms per move — faster easier for sack learning
-	StockfishInitTimeMs = 2000 // ms to wait for uciok / readyok on startup
+	StockfishMoveTimeMs  = 10   // ms per move — faster easier for sack learning
+	StockfishInitTimeMs  = 2000 // ms to wait for uciok / readyok on startup
 	StockfishQueryTimeMs = 3000 // ms ceiling per bestmove query
 )
 
@@ -46,19 +46,19 @@ const (
 // ============================================================================
 
 type ChessAPIResponse struct {
-	Type      string  `json:"type"`
-	Move      string  `json:"move"`      // UCI: "e2e4", "e7e8q"
-	Eval      float64 `json:"eval"`      // pawns, + = white winning
-	WinChance float64 `json:"winChance"` // 0-100, 50 = equal
-	SAN       string  `json:"san"`       // empty for local engine (main.go falls back to Move)
-	From      string  `json:"from"`
-	To        string  `json:"to"`
-	Piece     string  `json:"piece"`
-	IsCapture   bool  `json:"isCapture"`
-	IsCastling  bool  `json:"isCastling"`
-	IsPromotion bool  `json:"isPromotion"`
-	Promotion   string `json:"promotion"`
-	Mate        *int   `json:"mate"`
+	Type        string  `json:"type"`
+	Move        string  `json:"move"`      // UCI: "e2e4", "e7e8q"
+	Eval        float64 `json:"eval"`      // pawns, + = white winning
+	WinChance   float64 `json:"winChance"` // 0-100, 50 = equal
+	SAN         string  `json:"san"`       // empty for local engine (main.go falls back to Move)
+	From        string  `json:"from"`
+	To          string  `json:"to"`
+	Piece       string  `json:"piece"`
+	IsCapture   bool    `json:"isCapture"`
+	IsCastling  bool    `json:"isCastling"`
+	IsPromotion bool    `json:"isPromotion"`
+	Promotion   string  `json:"promotion"`
+	Mate        *int    `json:"mate"`
 }
 
 // ============================================================================
@@ -69,14 +69,13 @@ type stockfishProc struct {
 	cmd    *exec.Cmd
 	writer *bufio.Writer
 	lines  chan string // persistent reader goroutine pushes every line here
-	mu     sync.Mutex // guards UCI I/O per query
+	mu     sync.Mutex  // guards UCI I/O per query
 	ready  bool
 }
 
 var (
-	sfProc   *stockfishProc
-	sfOnce   sync.Once
-	sfMu     sync.Mutex // guards sfProc init retry
+	sfProc *stockfishProc
+	sfMu   sync.Mutex // guards sfProc init retry
 )
 
 // findStockfish resolves the Stockfish binary path.
