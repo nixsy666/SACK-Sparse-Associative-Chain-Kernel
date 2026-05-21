@@ -157,6 +157,7 @@ The UFT frames reality as a standing wave oscillating between centrifugal spin a
 ## Roadmap
 
 - **Go binary** — field state as a compiled executable with callback API, near bare-metal field computation
+- **Fixes and code tests** — various fixes code tests and rewrites to achieve desired results  
 - **Raspberry Pi 4B deployment** — dedicated field runner, persistent blob storage, always-warm field memory  
 - **DSP chip integration** — sine signal propagation along neuron chains on native wave arithmetic hardware
 - **FAISS integration** — SACK handles concept clustering, FAISS handles word-level vector search
@@ -165,6 +166,11 @@ The UFT frames reality as a standing wave oscillating between centrifugal spin a
 - **FPGA implementation** — Tang 9K / Spartan 6 hardware validation pre-ASIC
 
 ---
+
+## Major changes from V17 onwards
+- Worked on a proposal to remove all weights from games and instead dropped back to win and piece taking reinforcing
+See proposal [here] ./v17-plus-proposal.MD 
+
 
 ## Licence
 
@@ -187,3 +193,5 @@ Neither party could have produced this alone in this form. That is the honest ac
 **Nicholas (Nixsy) & Claude — 2026**
 
 ![an image of the working flowmap from functionality](https://github.com/nixsy666/SACK-Sparse-Associative-Chain-Kernel/blob/main/flow_Diagram.drawio.png?raw=true "Flow image from draw.io")
+
+
