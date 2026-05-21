@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SACK CORTEX — NEURAL VISUALIZER v1.0</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.85);
+            padding: 12px 20px;
+            border-left: 3px solid #00e5ff;
+            color: #c0e8f5;
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+            font-size: 12px;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Courier New', monospace;
+        }
+        #info h1 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            letter-spacing: 2px;
+            color: #00e5ff;
+        }
+        #info p {
+            margin: 0;
+            font-size: 10px;
+            opacity: 0.7;
+        }
+        #stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.75);
+            padding: 8px 15px;
+            font-size: 11px;
+            font-family: monospace;
+            color: #88ffaa;
+            border-radius: 4px;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+        .controls-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(10,20,30,0.9);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #2a4a6a;
+            backdrop-filter: blur(8px);
+            font-size: 11px;
+            color: #aaa;
+            pointer-events: auto;
+            font-family: monospace;
+        }
+        .controls-panel button {
+            background: #0a1a2a;
+            border: 1px solid #2a5a7a;
+            color: #8ac;
+            padding: 4px 12px;
+            margin: 2px 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 10px;
+            transition: all 0.2s;
+        }
+        .controls-panel button:hover {
+            background: #1a3a5a;
+            color: #fff;
+            border-color: #00e5ff;
+        }
+        .controls-panel select {
+            background: #0a1a2a;
+            border: 1px solid #2a5a7a;
+            color: #8ac;
+            padding: 4px;
+            font-family: monospace;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        .status-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .status-badge.w { background: #00e5ff; box-shadow: 0 0 8px #00e5ff; }
+        .status-badge.b { background: #ff3d6e; box-shadow: 0 0 8px #ff3d6e; }
+        .stat-row {
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+        }
+        hr {
+            border-color: #2a4a6a;
+            margin: 6px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>🔮 SACK CORTEX — NEURAL FIELD VISUALIZER</h1>
+        <p>spiral field · 64 neurons · active chain resonance</p>
+    </div>
+    <div id="stats">
+        <div><span class="status-badge w"></span> WHITE <span id="wChains">0</span> chains · <span id="wConf">0.00</span> conf</div>
+        <div><span class="status-badge b"></span> BLACK <span id="bChains">0</span> chains · <span id="bConf">0.00</span> conf</div>
+        <hr>
+        <div>🌊 ACTIVE CHAIN POS: <span id="chainPos">—</span>   🧬 GENERATION: <span id="genNum">0</span></div>
+        <div>💎 NEURONS: <span id="activeNeurons">0</span>/64 active · 🏆 WINS: <span id="wWins">0</span> | <span id="bWins">0</span></div>
+    </div>
+    <div class="controls-panel">
+        <div style="margin-bottom:6px;">⚙️ VISUAL MODE</div>
+        <button id="modeField">FIELD STRENGTH</button>
+        <button id="modeActivity">ACTIVATION HEAT</button>
+        <button id="modeSubsack">SUBSACK DEPTH</button>
+        <div style="margin-top:8px;">
+            🧠 SHOW: 
+            <select id="cortexSelect">
+                <option value="w">WHITE CORTEX</option>
+                <option value="b">BLACK CORTEX</option>
+            </select>
+            <button id="refreshBtn">⟳ REFRESH</button>
+        </div>
+        <div style="margin-top:8px; font-size:9px; opacity:0.6;">
+            🖱️ Drag to rotate · Scroll to zoom
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'https://unpkg.com/three@0.128.0/examples/jsm/controls/OrbitControls.js';
+
+        // ---- CONFIG ----
+        const API = ''; // same origin
+        const NEURON_COUNT = 64;
+        const SPIRAL_COILS = 8;
+        const SPIRAL_BASE = 8;
+        const FIELD_SIZE = (() => {
+            let total = 0;
+            for (let k = 0; k < SPIRAL_COILS; k++) total += SPIRAL_BASE * Math.pow(2, k);
+            return total;
+        })();
+
+        // Spiral mapping helper
+        const spiralMap = (() => {
+            let sizes = [], starts = [], total = 0;
+            for (let k = 0; k < SPIRAL_COILS; k++) {
+                sizes.push(SPIRAL_BASE * Math.pow(2, k));
+                starts.push(total);
+                total += sizes[k];
+            }
+            return { sizes, starts, total };
+        })();
+
+        function spiralCoil(pos) {
+            let p = ((pos % FIELD_SIZE) + FIELD_SIZE) % FIELD_SIZE;
+            for (let k = SPIRAL_COILS - 1; k >= 0; k--) {
+                if (p >= spiralMap.starts[k]) return k;
+            }
+            return 0;
+        }
+
+        function coilRadius(pos) {
+            return 4 + spiralCoil(pos) * 3;
+        }
+
+        // ---- Three.js setup ----
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020508);
+        scene.fog = new THREE.FogExp2(0x020508, 0.003);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(15, 12, 18);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.2;
+        controls.rotateSpeed = 1.0;
+        controls.target.set(0, 0, 0);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x111122);
+        scene.add(ambientLight);
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        mainLight.position.set(5, 10, 7);
+        mainLight.castShadow = true;
+        scene.add(mainLight);
+        const backLight = new THREE.PointLight(0x4466aa, 0.4);
+        backLight.position.set(-3, 2, -5);
+        scene.add(backLight);
+        const fillLight = new THREE.PointLight(0xffaa66, 0.3);
+        fillLight.position.set(2, 3, 4);
+        scene.add(fillLight);
+        
+        // Helper: Ground grid
+        const gridHelper = new THREE.GridHelper(30, 20, 0x2a4a6a, 0x1a3a5a);
+        gridHelper.position.y = -3.5;
+        scene.add(gridHelper);
+        
+        // Stars background effect
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 800;
+        const starPositions = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+            starPositions[i*3] = (Math.random() - 0.5) * 200;
+            starPositions[i*3+1] = (Math.random() - 0.5) * 80;
+            starPositions[i*3+2] = (Math.random() - 0.5) * 80 - 40;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMaterial = new THREE.PointsMaterial({ color: 0x88aacc, size: 0.08, transparent: true, opacity: 0.5 });
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+        
+        // Central glow
+        const centerGlow = new THREE.PointLight(0x2266aa, 0.5, 25);
+        centerGlow.position.set(0, 0, 0);
+        scene.add(centerGlow);
+
+        // Data structures
+        let neuronSpheres = [];
+        let neuronTrails = [];
+        let currentCortex = 'w';
+        let currentMode = 'field'; // field, activity, subsack
+        let currentData = null;
+        let lastChainPos = null;
+        let chainTrail = null;
+        
+        // ---- Helper: get color for neuron value based on mode ----
+        function getNeuronColor(n, idx, mode, sackStats) {
+            if (!n) return 0x333333;
+            
+            // Normalize activation (0-1 range, with cap at 30)
+            let actNorm = Math.min(1, (n.activations || 0) / 30);
+            
+            if (mode === 'activity') {
+                // Heat map: blue (low) -> cyan -> white (high)
+                const hue = 200 - actNorm * 60;
+                return new THREE.Color(`hsl(${hue}, 80%, ${40 + actNorm * 40}%)`);
+            }
+            
+            if (mode === 'subsack') {
+                // Determine dominant subsack growth stage
+                let maxBits = 4;
+                if (n.subSacks && n.subSacks.length) {
+                    for (let ss of n.subSacks) {
+                        if ((ss.growthBits || 4) > maxBits) maxBits = ss.growthBits || 4;
+                    }
+                }
+                // Color by depth: 4=purple,8=blue,16=cyan,32=green,64=gold
+                const depthColors = {4:0x8844aa, 8:0x3366cc, 16:0x22aacc, 32:0x44cc88, 64:0xffaa44};
+                let col = depthColors[maxBits] || 0x6699cc;
+                // Mix with activation brightness
+                return new THREE.Color(col).multiplyScalar(0.6 + actNorm * 0.6);
+            }
+            
+            // FIELD MODE — use peak field strength at neuron's peak position
+            let peakVal = 0;
+            if (n.field && n.field[n.peakPos] !== undefined) {
+                peakVal = Math.abs(n.field[n.peakPos]);
+            }
+            // Use activation as fallback
+            if (peakVal === 0) peakVal = actNorm * 0.5;
+            // Color: red (negative/weak) -> blue -> cyan (strong)
+            const hue = 180 - Math.min(160, peakVal * 160);
+            const sat = 70 + peakVal * 20;
+            const lit = 40 + peakVal * 45;
+            return new THREE.Color(`hsl(${hue}, ${sat}%, ${lit}%)`);
+        }
+        
+        // ---- Build 3D neuron positions on spiral rings ----
+        function buildNeuronPositions(sackStats) {
+            const positions = [];
+            const neurons = sackStats?.neurons || [];
+            for (let i = 0; i < NEURON_COUNT; i++) {
+                let peakPos = 0;
+                if (neurons[i]) peakPos = neurons[i].peakPos || 0;
+                else peakPos = Math.floor(i / NEURON_COUNT * FIELD_SIZE);
+                const coil = spiralCoil(peakPos);
+                const ringRadius = 3 + coil * 1.8;
+                const startAngle = (peakPos - spiralMap.starts[coil]) / spiralMap.sizes[coil] * Math.PI * 2;
+                // Distribute on ring with slight vertical offset based on coil
+                const x = Math.cos(startAngle) * ringRadius;
+                const z = Math.sin(startAngle) * ringRadius;
+                const y = Math.sin(coil * 0.8) * 0.8;
+                positions.push({ x, y, z, coil, peakPos });
+            }
+            return positions;
+        }
+        
+        // ---- Update 3D visualization ----
+        function updateVisualization(sackStats) {
+            if (!sackStats || !sackStats.neurons) return;
+            
+            const neurons = sackStats.neurons;
+            const positions = buildNeuronPositions(sackStats);
+            
+            // Remove old objects
+            neuronSpheres.forEach(obj => scene.remove(obj));
+            neuronSpheres = [];
+            
+            // Create new spheres
+            for (let i = 0; i < NEURON_COUNT; i++) {
+                const n = neurons[i];
+                const pos = positions[i];
+                if (!pos) continue;
+                
+                const color = getNeuronColor(n, i, currentMode, sackStats);
+                const radius = 0.28 + (n?.activations ? Math.min(0.25, (n.activations / 80) * 0.25) : 0);
+                const geometry = new THREE.SphereGeometry(radius, 24, 24);
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: currentMode === 'activity' ? 0x2266aa : 0x112233,
+                    emissiveIntensity: n?.activations ? 0.2 + Math.min(0.4, n.activations / 50) : 0.1,
+                    roughness: 0.3,
+                    metalness: 0.7
+                });
+                const sphere = new THREE.Mesh(geometry, material);
+                sphere.position.set(pos.x, pos.y, pos.z);
+                sphere.userData = { idx: i, activations: n?.activations || 0, peakPos: pos.peakPos, coil: pos.coil };
+                scene.add(sphere);
+                neuronSpheres.push(sphere);
+                
+                // Add glow outline for boundary neurons
+                if (n?.isBoundary) {
+                    const glowGeo = new THREE.SphereGeometry(radius + 0.08, 16, 16);
+                    const glowMat = new THREE.MeshBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.25 });
+                    const glow = new THREE.Mesh(glowGeo, glowMat);
+                    sphere.add(glow);
+                }
+                
+                // Add connecting lines between neighboring neurons (same coil, adjacent)
+                // Simplified: store for later line drawing
+            }
+            
+            // Draw connections (same coil, angular neighbors)
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x2a5a7a, transparent: true, opacity: 0.3 });
+            const groups = new Map();
+            for (let i = 0; i < NEURON_COUNT; i++) {
+                const p = positions[i];
+                if (!p) continue;
+                if (!groups.has(p.coil)) groups.set(p.coil, []);
+                groups.get(p.coil).push({ idx: i, pos: p, angle: Math.atan2(p.z, p.x) });
+            }
+            for (let [coil, members] of groups.entries()) {
+                members.sort((a,b) => a.angle - b.angle);
+                for (let i = 0; i < members.length; i++) {
+                    const next = members[(i+1) % members.length];
+                    const points = [
+                        new THREE.Vector3(members[i].pos.x, members[i].pos.y, members[i].pos.z),
+                        new THREE.Vector3(next.pos.x, next.pos.y, next.pos.z)
+                    ];
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const line = new THREE.Line(geometry, lineMaterial);
+                    scene.add(line);
+                    neuronTrails.push(line);
+                }
+            }
+            
+            // Highlight active chain position
+            if (sackStats.spiralPos && sackStats.spiralPos !== lastChainPos) {
+                lastChainPos = sackStats.spiralPos;
+                if (chainTrail) scene.remove(chainTrail);
+                const coil = spiralCoil(sackStats.spiralPos);
+                const ringRadius = 3 + coil * 1.8;
+                const localPos = sackStats.spiralPos - spiralMap.starts[coil];
+                const angle = (localPos / spiralMap.sizes[coil]) * Math.PI * 2;
+                const x = Math.cos(angle) * ringRadius;
+                const z = Math.sin(angle) * ringRadius;
+                const y = Math.sin(coil * 0.8) * 0.8;
+                
+                // Create a pulsing ring at chain position
+                const ringGeo = new THREE.RingGeometry(0.25, 0.55, 16);
+                const ringMat = new THREE.MeshStandardMaterial({
+                    color: sackStats.name === 'White' ? 0x00e5ff : 0xff3d6e,
+                    emissive: sackStats.name === 'White' ? 0x0088aa : 0xaa2255,
+                    emissiveIntensity: 0.8,
+                    side: THREE.DoubleSide,
+                    transparent: true
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.position.set(x, y + 0.1, z);
+                ring.lookAt(0, y, 0);
+                scene.add(ring);
+                chainTrail = ring;
+                
+                // Pulse animation stored in ring userData
+                ring.userData = { pulse: 0 };
+            }
+            
+            // Update stats panel
+            const active = neurons.filter(n => n && (n.activations || 0) > 0).length;
+            document.getElementById('activeNeurons').innerText = active;
+            document.getElementById('wChains').innerText = sackStats.totalChains || 0;
+            document.getElementById('wConf').innerText = (sackStats.conf || 0).toFixed(3);
+            document.getElementById('genNum').innerText = window.globalGen || 0;
+            document.getElementById('chainPos').innerText = sackStats.spiralPos !== undefined ? `C${spiralCoil(sackStats.spiralPos || 0)}:${sackStats.spiralPos || 0}` : '—';
+        }
+        
+        // ---- Fetch and update from backend ----
+        async function fetchCortex() {
+            try {
+                const res = await fetch('/status');
+                const data = await res.json();
+                window.globalGen = data.generations;
+                document.getElementById('wWins').innerText = data.wWins || 0;
+                document.getElementById('bWins').innerText = data.bWins || 0;
+                
+                let sackData = currentCortex === 'w' ? data.sackW : data.sackB;
+                if (sackData) {
+                    if (currentCortex === 'w') {
+                        document.getElementById('bChains').innerText = data.sackB?.totalChains || 0;
+                        document.getElementById('bConf').innerText = (data.sackB?.conf || 0).toFixed(3);
+                    } else {
+                        document.getElementById('wChains').innerText = data.sackW?.totalChains || 0;
+                        document.getElementById('wConf').innerText = (data.sackW?.conf || 0).toFixed(3);
+                        document.getElementById('bChains').innerText = sackData.totalChains || 0;
+                        document.getElementById('bConf').innerText = (sackData.conf || 0).toFixed(3);
+                    }
+                    updateVisualization(sackData);
+                }
+            } catch(e) { console.warn('Fetch error:', e); }
+        }
+        
+        // ---- Mode switching ----
+        function setMode(mode) {
+            currentMode = mode;
+            fetchCortex();
+        }
+        
+        // ---- Animation loop ----
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.016;
+            
+            // Animate chain trail ring pulse
+            if (chainTrail && chainTrail.userData) {
+                let pulse = (chainTrail.userData.pulse || 0) + 0.05;
+                const intensity = 0.5 + Math.sin(pulse * 8) * 0.4;
+                chainTrail.material.emissiveIntensity = intensity * 0.8;
+                chainTrail.userData.pulse = pulse;
+            }
+            
+            // Gentle rotation for stars
+            stars.rotation.y += 0.0005;
+            stars.rotation.x += 0.0003;
+            
+            // Update center glow intensity
+            centerGlow.intensity = 0.4 + Math.sin(time) * 0.15;
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // ---- Event binding & init ----
+        document.getElementById('modeField').addEventListener('click', () => setMode('field'));
+        document.getElementById('modeActivity').addEventListener('click', () => setMode('activity'));
+        document.getElementById('modeSubsack').addEventListener('click', () => setMode('subsack'));
+        document.getElementById('refreshBtn').addEventListener('click', fetchCortex);
+        document.getElementById('cortexSelect').addEventListener('change', (e) => {
+            currentCortex = e.target.value;
+            fetchCortex();
+        });
+        
+        // Initial fetch and periodic refresh (every 2 seconds)
+        fetchCortex();
+        setInterval(fetchCortex, 2000);
+        
+        animate();
+        
+        // Handle window resize
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Add small label for each cortex side (text sprites)
+        function addLabel(text, color, x, y, z) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 128;
+            canvas.height = 64;
+            ctx.fillStyle = 'rgba(0,0,0,0)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'Bold 18px "Courier New"';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.fillText(text, canvas.width/2, canvas.height/2);
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(1.2, 0.6, 1);
+            sprite.position.set(x, y, z);
+            scene.add(sprite);
+        }
+        addLabel('WHITE CORTEX', '#00e5ff', -5, 4.5, 5);
+        addLabel('BLACK CORTEX', '#ff3d6e', 5, 4.5, 5);
+        
+        console.log('✨ 3D SACK Cortex Visualizer Loaded');
+    </script>
+</body>
+</html>
