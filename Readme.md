@@ -169,7 +169,7 @@ The UFT frames reality as a standing wave oscillating between centrifugal spin a
 
 ## Major changes from V17 onwards
 - Worked on a proposal to remove all weights from games and instead dropped back to win and piece taking reinforcing
-See proposal [[root](https://github.com/nixsy666/SACK-Sparse-Associative-Chain-Kernel/edit/main/v17-plus-proposal.MD) 
+See proposal [v17-plus-proposal.MD](/../../v17-plus-proposal.MD) 
 
 
 ## Licence
