@@ -728,15 +728,12 @@ func (s *SACKEngine) addLink(nid, fieldPos int, before, after [CoarseCells]float
 		s.CheckHistory = s.CheckHistory[len(s.CheckHistory)-8:]
 	}
 
+	// v17 COMPLIANT: Push clusters to the neurons to track internal frequency,
+	// but do NOT truncate s.Chain. Let it accumulate for the entire game duration.
 	chainMax := elasticChainMax(s.LastConf)
-	if len(s.Chain) >= chainMax {
+	if len(s.Chain) % chainMax == 0 {
 		s.Neurons[nid].storeCluster(s.Chain)
 		s.TotalChains++
-		// Keep current link as seed for the next segment.
-		// ChainSig is intentionally NOT reset — the rolling XOR must persist
-		// for the full game so the terminal win signal can trace the entire
-		// causal tree back to the opening moves.
-		s.Chain = append([]ChainLink{}, link)
 	}
 }
 
